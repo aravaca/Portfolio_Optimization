@@ -1,0 +1,6 @@
+yfinance == 0.2.58
+datetime == 5.5
+pandas-datareader == 0.10.0
+fredapi == 0.5.2
+# pip install -r requirements.txt
+
