@@ -9,11 +9,12 @@ from pykrx import stock
 import datetime as dt
 import openpyxl
 
+# pip install -r requirements.txt
+
 country = 'KR' # None or one of the following: KR, US, JP, CH, UK, ETC
 limit = 100
 sp500 = True # False for nasdaq100
 
-# endDate = dt.datetime.today() - dt.timedelta(days = 31) #한국 시간 기준
 formattedDate = dt.datetime.today().strftime("%Y%m%d")
 dfKospi = stock.get_market_fundamental(formattedDate)
 
@@ -100,7 +101,7 @@ def buffet_score (de, cr, pbr, roe, roa, div):
         score += 1
     if cr is not None and (cr >= 1.5 and cr <= 2.5):
         score +=1
-    if pbr is not None and pbr <= 1.5:
+    if pbr is not None and (pbr <= 1.5 and pbr != 0):
         score +=1
     if roe is not None and roe >= 0.08:
         score +=1
@@ -112,9 +113,9 @@ def buffet_score (de, cr, pbr, roe, roa, div):
     return score
 
 def getFs (item, ticker):
-    if country == "KR":
+    if country == 'KR':
         try:
-           return dfKospi.loc[ticker[:6], item.upper()] 
+           return dfKospi.loc[ticker[:6], item] 
         except:
             return None
 
@@ -149,15 +150,15 @@ for ticker in tickers:
     debtToEquity = debtToEquity/100 if debtToEquity is not None else None
     currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
     pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
-    if pbr is None: pbr = getFs('pbr', ticker)
+    if pbr is None: pbr = getFs('PBR', ticker)
 
     roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
     roa = info.get('returnOnAssets', None) # > 6% (0.06) 
     per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
-    if per is None: per = getFs('per', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
+    if per is None: per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
     
     eps = info.get('trailingEps', None) # earnings per share, the higher the better
-    if eps is None: eps = getFs('eps', ticker)
+    if eps is None: eps = getFs('EPS', ticker)
 
     divGrowth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
     quantitativeBuffetScore = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, divGrowth)
@@ -187,6 +188,6 @@ df = pd.DataFrame(data)
 df.dropna(subset=["D/E", "C/R", "PBR", "ROE", "ROA", "PER", "EPS"], inplace = True)
 
 df_sorted = df.sort_values(by = "B-Score", ascending = False)
-# print(df_sorted) 
-df_sorted.to_excel("output.xlsx", index=False)
+print(df_sorted) 
+# df_sorted.to_excel("/output./xlsx", index=False)
 
