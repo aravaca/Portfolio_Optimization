@@ -4,5 +4,6 @@ pandas-datareader == 0.10.0
 fredapi == 0.5.2
 openai == 1.78.1
 python-dotenv == 1.1.0
+lxml == 5.4.0
 # pip install -r requirements.txt
 
