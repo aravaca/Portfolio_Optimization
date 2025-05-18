@@ -11,9 +11,9 @@ import openpyxl
 
 # pip install -r requirements.txt
 
-country = 'KR' # None or one of the following: KR, US, JP, CH, UK, ETC
-limit = 100
-sp500 = True # False for nasdaq100
+country = input('Country (KR, US, JP, CH, UK): ') # None or one of the following: KR, US, JP, CH, UK, ETC
+limit = int(float(input('Limit: ')))
+sp500 = input('S&P500? (y/n, n for NASDAQ100): ').lower().strip() == 'y' # False for nasdaq100
 
 formattedDate = dt.datetime.today().strftime("%Y%m%d")
 dfKospi = stock.get_market_fundamental(formattedDate)
@@ -188,6 +188,6 @@ df = pd.DataFrame(data)
 df.dropna(subset=["D/E", "C/R", "PBR", "ROE", "ROA", "PER", "EPS"], inplace = True)
 
 df_sorted = df.sort_values(by = "B-Score", ascending = False)
-print(df_sorted) 
-# df_sorted.to_excel("/output./xlsx", index=False)
+# print(df_sorted) 
+df_sorted.to_excel("/output./xlsx", index=False)
 
