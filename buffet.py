@@ -8,17 +8,18 @@ import requests
 from pykrx import stock
 import datetime as dt
 import openpyxl
+import math
 
 # pip install -r requirements.txt
 
-country = input('Country (KR, JP, CH, UK 중 선택. 미국 S&P500 및 NASDAQ100 기업의 재무건전성 분석 희망시 US 입력): ').upper() # None or one of the following: KR, US, JP, CH, UK, ETC
+country = input('Country (KR, JP, CH, UK 중 선택. 미국 S&P500 및 NASDAQ100 희망 시 US 입력): ').upper() # None or one of the following: KR, US, JP, CH, UK, ETC
 if country == 'US': 
     country = None 
 
 if not country:
     limit = 100
 else:
-    limit = int(float(input('Limit: ')))
+    limit = int(float(input('Limit: '))) #input always accepts a str
 
 if not country:
     sp500 = input('S&P500? (y/n, n for NASDAQ100): ').lower().strip() == 'y' # False for nasdaq100
@@ -31,7 +32,6 @@ weekend = dt.datetime.today().weekday() - 4 # returns 1 for saturday, 2 for sund
 formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if dt.datetime.today().weekday() >= 5 else dt.datetime.today().strftime("%Y%m%d")
 
 dfKospi = stock.get_market_fundamental(formattedDate)
-
 data = []
 
 # Set Pandas to display all columns and rows
@@ -111,7 +111,7 @@ def get_tickers_by_country(country: str, limit: int = 100, apikey: str = 'your_a
 
 # print(response.output_text)
 
-def buffet_score (de, cr, pbr, roe, roa, eps, div):
+def buffet_score (de, cr, pbr, roe, roa, eps, div, bvps, icr):
     score = 0
     if de is not None and de <= 0.5:
         score += 1
@@ -123,11 +123,15 @@ def buffet_score (de, cr, pbr, roe, roa, eps, div):
         score +=1
     if roa is not None and roa >= 0.06:
         score +=1
-    if div:
+    if div: #bool
         score +=1
-    if eps:
+    if eps: #bool
         score +=1
-    # MAX: 7 
+    if bvps: #bool
+        score +=1
+    if icr is not None and icr >= 5:
+        score +=1
+    # MAX: 9
     return score
 
 def getFs (item, ticker):
@@ -135,7 +139,6 @@ def getFs (item, ticker):
         return dfKospi.loc[ticker[:6], item] 
     except:
         return None
-    
 
 def has_stable_dividend_growth(ticker):
     stock = yf.Ticker(ticker)
@@ -149,7 +152,8 @@ def has_stable_dividend_growth(ticker):
     if len(annual_divs) < 10:
         return False
     
-    recent_years = sorted(annual_divs.index)[-11:-1] # returns [last year - 9 = 2015, 2016, ..., last year = 2024]
+    recent_years = sorted(annual_divs.index)[-8:-1] # returns [last year - 9 = 2015, 2016, ..., last year = 2024], # use -11 to start around 10 years ago from now
+
     if recent_years[0] < dt.datetime.today().year - 12: # sift out old data
         return False
 
@@ -179,6 +183,58 @@ def has_stable_eps_growth(ticker):
         return False
 
 
+# gets the most recent interest coverage ratio available
+def get_interest_coverage_ratio(ticker):
+    financials = yf.Ticker(ticker).financials # Annual financials, columns = dates (most recent first)
+    ratio = None
+    for date in financials.columns:
+        if date.year < dt.datetime.today().year - 5: # sift out old data
+            return None
+
+        try:
+            ebit = financials.loc["Operating Income", date]
+            interest_expense = financials.loc["Interest Expense", date]
+            if math.isnan(interest_expense) or math.isnan(ebit):
+                continue # Avoid division by zero
+            else:
+                ratio = round((ebit / abs(interest_expense)), 2)
+                break
+        except KeyError:
+            continue
+    return ratio
+
+def has_stable_book_value_growth(ticker, sector: str):
+    ticker = yf.Ticker(ticker)
+
+    # Get annual balance sheet
+    balance_sheet = ticker.balance_sheet # Columns are by period (most recent first)
+
+    # Reverse columns to go oldest → newest
+    balance_sheet = balance_sheet.iloc[:, ::-1]
+    book_values = []
+
+    for date in balance_sheet.columns:
+        if date.year < dt.datetime.today().year - 6: # sift out old data
+            return False
+        
+        try:
+            book_value = balance_sheet.loc["Common Stock Equity", date]
+            outstanding_shares = balance_sheet.loc["Ordinary Shares Number", date]
+            if math.isnan(book_value) or math.isnan(outstanding_shares):
+                continue
+            else:
+                bvps = book_value / outstanding_shares 
+                book_values.append(round(bvps, 2))
+        except Exception as e:
+            continue
+            
+    if len(book_values) < 2:
+        return False
+    
+    tolerance = 0.85 if sector in {'Industrials', 'Technology', 'Energy', 'Consumer Cyclical', 'Basic Materials'} else 0.9 #set is faster than list in checking O(1) avg
+    return all(earlier * tolerance <= later for earlier, later in zip(book_values, book_values[1:]))
+
+
 tickers = get_tickers(country, limit, sp500)
 # tickers = ['AAPL']
 
@@ -191,17 +247,20 @@ for ticker in tickers:
     debtToEquity = debtToEquity/100 if debtToEquity is not None else None
     currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
     pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
-    if pbr is None and country == 'KR': pbr = getFs('PBR', ticker)
+    if not pbr and country == 'KR': pbr = getFs('PBR', ticker)
 
     roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
     roa = info.get('returnOnAssets', None) # > 6% (0.06) 
     per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
-    if per is None and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
+    if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
     
-    eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better
+    eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, # 저per 종목 선별, Buffet looks for stable EPS growth
     div_growth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
-    quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth)
-    # eps_growth = get_eps_stability(ticker, 5).get("EPS CAGR") # 저per 종목 선별, Buffet looks for stable EPS growth
+    bvps_growth = has_stable_book_value_growth(ticker, sector)
+    icr = get_interest_coverage_ratio(ticker)
+    quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
+
+    ## FOR extra 10 score:::
     # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
     # KEY: sustainable && long-term durability
     # ex) brand power(Coca-Cola), network effect(Facebook, Visa), cost advantage(Walmart, Costco), high switching costs(Adobe),
@@ -213,18 +272,20 @@ for ticker in tickers:
         "Sector": sector,
         "Price": currentPrice,
         "D/E": debtToEquity,
-        "C/R": currentRatio,
+        "CR": currentRatio,
         "PBR": pbr,
         "ROE": roe,
         "ROA": roa,
         "PER": per,
+        "ICR": icr,
         "EPS Growth": eps_growth,
         "Div Growth": div_growth ,
-        "B-Score": quantitative_buffet_score ,
+        "BVPS Growth": bvps_growth,
+        "B-Score": quantitative_buffet_score,
     })
 
 df = pd.DataFrame(data)
-df.dropna(subset=["D/E", "C/R", "PBR", "ROE", "ROA", "PER"], inplace = True)
+df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
 df_sorted = df.sort_values(by = "B-Score", ascending = False)
 
