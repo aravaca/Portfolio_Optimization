@@ -9,12 +9,10 @@ from pykrx import stock
 import datetime as dt
 import openpyxl
 import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # pip install -r requirements.txt
 
 country = input('Country (KR, JP, CH, UK 중 선택. 미국 S&P500 및 NASDAQ100 희망 시 US 입력): ').upper() # None or one of the following: KR, US, JP, CH, UK, ETC
-num_thread = 20
 if country == 'US': 
     country = None 
 
@@ -240,88 +238,56 @@ def has_stable_book_value_growth(ticker, sector: str):
 tickers = get_tickers(country, limit, sp500)
 # tickers = ['AAPL']
 
-def process_ticker_quantitatives(ticker):
-    try:
-        info = yf.Ticker(ticker).info
-        name = info.get("longName", "N/A")
-        sector = info.get("sector", "N/A")
-        currentPrice = info.get("currentPrice", "N/A")
-        debtToEquity = info.get('debtToEquity', None) # < 0.5
-        debtToEquity = debtToEquity/100 if debtToEquity is not None else None
-        currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
-        pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
-        if not pbr and country == 'KR': pbr = getFs('PBR', ticker)
+for ticker in tickers:
+    info = yf.Ticker(ticker).info
+    name = info.get("longName", "N/A")
+    sector = info.get("sector", "N/A")
+    currentPrice = info.get("currentPrice", "N/A")
+    debtToEquity = info.get('debtToEquity', None) # < 0.5
+    debtToEquity = debtToEquity/100 if debtToEquity is not None else None
+    currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
+    pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
+    if not pbr and country == 'KR': pbr = getFs('PBR', ticker)
 
-        roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
-        roa = info.get('returnOnAssets', None) # > 6% (0.06) 
-        per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
-        if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
-        
-        eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, # 저per 종목 선별, Buffet looks for stable EPS growth
-        div_growth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
-        bvps_growth = has_stable_book_value_growth(ticker, sector)
-        icr = get_interest_coverage_ratio(ticker)
-        quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
-
-        ## FOR extra 10 score:::
-        # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
-        # KEY: sustainable && long-term durability
-        # ex) brand power(Coca-Cola), network effect(Facebook, Visa), cost advantage(Walmart, Costco), high switching costs(Adobe),
-        # regulatory advantage(gov protection), patients(Pfizer, Intel)
-
-        return {
-            "Ticker": ticker,
-            "Name": name,
-            "Sector": sector,
-            "Price": currentPrice,
-            "D/E": debtToEquity,
-            "CR": currentRatio,
-            "PBR": pbr,
-            "ROE": roe,
-            "ROA": roa,
-            "PER": per,
-            "ICR": icr,
-            "EPS Growth": eps_growth,
-            "Div Growth": div_growth ,
-            "BVPS Growth": bvps_growth,
-            "B-Score": quantitative_buffet_score,
-        }
-    except Exception as e:
-        return {
-            "Ticker": ticker,
-            "Name": '',
-            "Sector": '',
-            "Price": 0,
-            "D/E": 0,
-            "CR": 0,
-            "PBR": 0,
-            "ROE": 0,
-            "ROA": 0,
-            "PER": 0,
-            "ICR": 0,
-            "EPS Growth": False,
-            "Div Growth":  False,
-            "BVPS Growth": False,
-            "B-Score": 0,
-        }
+    roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
+    roa = info.get('returnOnAssets', None) # > 6% (0.06) 
+    per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
+    if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
     
+    eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, # 저per 종목 선별, Buffet looks for stable EPS growth
+    div_growth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
+    bvps_growth = has_stable_book_value_growth(ticker, sector)
+    icr = get_interest_coverage_ratio(ticker)
+    quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
 
-# Use multithreading to speed up
-with ThreadPoolExecutor(max_workers=num_thread) as executor: #1-20
-    futures = [executor.submit(process_ticker_quantitatives, ticker) for ticker in tickers]
-    for future in as_completed(futures):
-        data.append(future.result())
+    ## FOR extra 10 score:::
+    # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
+    # KEY: sustainable && long-term durability
+    # ex) brand power(Coca-Cola), network effect(Facebook, Visa), cost advantage(Walmart, Costco), high switching costs(Adobe),
+    # regulatory advantage(gov protection), patients(Pfizer, Intel)
+
+    data.append({
+        "Ticker": ticker,
+        "Name": name,
+        "Sector": sector,
+        "Price": currentPrice,
+        "D/E": debtToEquity,
+        "CR": currentRatio,
+        "PBR": pbr,
+        "ROE": roe,
+        "ROA": roa,
+        "PER": per,
+        "ICR": icr,
+        "EPS Growth": eps_growth,
+        "Div Growth": div_growth ,
+        "BVPS Growth": bvps_growth,
+        "B-Score": quantitative_buffet_score,
+    })
 
 df = pd.DataFrame(data)
 df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
 df_sorted = df.sort_values(by = "B-Score", ascending = False)
 
-if country: 
-    df_sorted.to_excel("result_" + country + ".xlsx", index=False)
-
-elif sp500:
-    df_sorted.to_excel("sp500.xlsx", index=False)
-else:
-    df_sorted.to_excel("nasdaq100.xlsx", index=False)
-
+# print(df_sorted) 
+df_sorted.to_excel("result.xlsx", index=False)
