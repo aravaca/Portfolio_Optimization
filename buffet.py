@@ -9,7 +9,9 @@ from pykrx import stock
 import datetime as dt
 import openpyxl
 import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from queue import Queue
+import threading
+import time
 
 # pip install -r requirements.txt
 
@@ -35,6 +37,7 @@ formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%
 
 dfKospi = stock.get_market_fundamental(formattedDate)
 data = []
+data_lock = threading.Lock()
 
 # Set Pandas to display all columns and rows
 pd.set_option('display.max_rows', None)  # To display all rows
@@ -50,6 +53,29 @@ fmp_key = os.getenv("FMP_API_KEY")
 
 # Use it with OpenAI
 openai.api_key = api_key
+
+system_prompt = """
+You are a financial analyst AI trained in Warren Buffett’s investment style. Your task is to analyze a company's long-term competitive advantage (economic moat) 
+based on high-quality, trustworthy public information.
+
+When answering:
+- Search the web for **the most recent, relevant data**
+- Only use **neutral, fact-based, and highly reliable sources** like Bloomberg, Reuters, WSJ, Financial Times, investor relations pages, or annual reports
+- Ignore social media, biased blogs, promotional material, and wikipedias.
+
+Analyze whether the company exhibits:
+- Brand strength
+- Network effects
+- Cost leadership
+- Switching costs
+- Intangible assets (e.g., patents, licensing)
+- Dominant market share via efficient scale
+
+Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
+Return a single integer as the final output based on the final verdict.
+"""
+
+client = OpenAI()
 
 def get_tickers(country: str, limit: int, sp500: bool):
     if country is not None:
@@ -80,38 +106,6 @@ def get_tickers_by_country(country: str, limit: int = 100, apikey: str = 'your_a
     response = requests.get(url, params=params)
     data = response.json()
     return [item['symbol'] for item in data]
-
-
-
-# system_prompt = """
-# You are a financial analyst AI specialized in company fundamentals, long-term growth, and competitive advantages. 
-# Your task is to extract and summarize key financial growth data and insights in a structured format for investment 
-# analysis utilizing available and highly reliable financial sources on the internet.
-# Respond only with clean, structured Python list syntax. Avoid explanations or headings.
-# """
-
-# user_prompt = """
-# Give me the following about Apple Inc:
-
-# 1. 10-year dividend growth rate (as decimal or percent),
-# 2. 5-year EPS growth rate (as decimal or percent),
-# 3. Brief description of the company's strongest moat (e.g. brand, ecosystem, scale, IP),
-# 4. 1~2 investment insights based on recent financial trends or durable competitive advantages.
-
-# Return everything as a clean Python list like:
-# [div_growth_10y, eps_growth_5y, "moat summary", "investment insight"]
-# """
-
-
-# client = OpenAI()
-
-# response = client.responses.create(
-#     model="gpt-4o",
-#     instructions=system_prompt,
-#     input=user_prompt,
-# )
-
-# print(response.output_text)
 
 def buffet_score (de, cr, pbr, roe, roa, eps, div, bvps, icr):
     score = 0
@@ -240,77 +234,144 @@ def has_stable_book_value_growth(ticker, sector: str):
 tickers = get_tickers(country, limit, sp500)
 # tickers = ['AAPL']
 
-def process_ticker_quantitatives(ticker):
-    try:
-        info = yf.Ticker(ticker).info
-        name = info.get("longName", "N/A")
-        sector = info.get("sector", "N/A")
-        currentPrice = info.get("currentPrice", "N/A")
-        debtToEquity = info.get('debtToEquity', None) # < 0.5
-        debtToEquity = debtToEquity/100 if debtToEquity is not None else None
-        currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
-        pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
-        if not pbr and country == 'KR': pbr = getFs('PBR', ticker)
+q = Queue()
+for ticker in tickers:
+    q.put(ticker)
 
-        roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
-        roa = info.get('returnOnAssets', None) # > 6% (0.06) 
-        per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
-        if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
-        
-        eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, # 저per 종목 선별, Buffet looks for stable EPS growth
-        div_growth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
-        bvps_growth = has_stable_book_value_growth(ticker, sector)
-        icr = get_interest_coverage_ratio(ticker)
-        quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
+def process_ticker_quantitatives():
+    while not q.empty():
+        ticker = q.get()
+        try:
+            info = yf.Ticker(ticker).info
+            name = info.get("longName") or info.get("shortName", ticker)
+            sector = info.get("sector", "N/A")
+            currentPrice = info.get("currentPrice", "N/A")
+            debtToEquity = info.get('debtToEquity', None) # < 0.5
+            debtToEquity = debtToEquity/100 if debtToEquity is not None else None
+            currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
+            pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
+            if not pbr and country == 'KR': pbr = getFs('PBR', ticker)
 
-        ## FOR extra 10 score:::
-        # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
-        # KEY: sustainable && long-term durability
-        # ex) brand power(Coca-Cola), network effect(Facebook, Visa), cost advantage(Walmart, Costco), high switching costs(Adobe),
-        # regulatory advantage(gov protection), patients(Pfizer, Intel)
+            roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
+            roa = info.get('returnOnAssets', None) # > 6% (0.06) 
+            per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
+            if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
+            
+            eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, # 저per 종목 선별, Buffet looks for stable EPS growth
+            div_growth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
+            bvps_growth = has_stable_book_value_growth(ticker, sector)
+            icr = get_interest_coverage_ratio(ticker)
+            quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
 
-        return {
-            "Ticker": ticker,
-            "Name": name,
-            "Sector": sector,
-            "Price": currentPrice,
-            "D/E": debtToEquity,
-            "CR": currentRatio,
-            "PBR": pbr,
-            "ROE": roe,
-            "ROA": roa,
-            "PER": per,
-            "ICR": icr,
-            "EPS Growth": eps_growth,
-            "Div Growth": div_growth ,
-            "BVPS Growth": bvps_growth,
-            "B-Score": quantitative_buffet_score,
-        }
-    except Exception as e:
-        return {
-            "Ticker": ticker,
-            "Name": '',
-            "Sector": '',
-            "Price": 0,
-            "D/E": 0,
-            "CR": 0,
-            "PBR": 0,
-            "ROE": 0,
-            "ROA": 0,
-            "PER": 0,
-            "ICR": 0,
-            "EPS Growth": False,
-            "Div Growth":  False,
-            "BVPS Growth": False,
-            "B-Score": 0,
-        }
+            ## FOR extra 10 score:::
+            # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
+            # KEY: sustainable && long-term durability
+            # ex) brand power(Coca-Cola), network effect(Facebook, Visa), cost advantage(Walmart, Costco), high switching costs(Adobe),
+            # regulatory advantage(gov protection), patients(Pfizer, Intel)
+
+            user_prompt = f"""
+            Search the web using trusted financial and business sources to evaluate the economic moat of the following company:
+
+            Company: {name}
+            Sector: {sector}
+            Recent Metrics (ignore the metrics that are 0 or missing):
+            - ROE: {roe}
+            - ROA: {roa}
+            - PBR: {pbr}
+            - PER: {per}
+            Search for:
+            - Notable Assets: e.g. Patents, Ecosystem, Strong Brand
+            - Customer Base: e.g. Mass market, Enterprises, Government
+            - Consistency & Durability: e.g. Is the advantage sustainable over decades? Is it resilient through market cycles?
+            - Cash Flow and Free Cash Flow
+            - Customer Loyalty & Pricing Power: e.g. Do customers prefer the product despite higher prices?
+            - Management Quality: e.g. Buffett prefers companies with "able and honest" managers who act in shareholders' interests and allocate capital wisely.
+
+            Analyze the following:
+            1. Type of moat(s)
+            2. How durable the moat is
+            3. Key risks or threats
+            4. Final verdict: Strong / Medium / Weak moat — with justification
+
+            Return a single integer for Python as the response based on the final verdict. Return 2 if the company has a Strong moat, return 1 for Medium moat
+             and return 0 for Weak moat or no moat. 
+            """.strip()
+
+            response = client.responses.create(
+            model="gpt-4o",
+            instructions=system_prompt,
+            input=user_prompt,
+            tools=[{
+                "type": "web_search_preview",
+                "user_location": {
+                    "type": "approximate",
+                    "country": "KR",
+                    "city": "Seoul",
+                    "region": "Seoul",
+                }
+            }],
+            )
+
+            print(name, response.output_text)
+
+            result = {
+                "Ticker": ticker,
+                "Name": name,
+                "Sector": sector,
+                "Price": currentPrice,
+                "D/E": debtToEquity,
+                "CR": currentRatio,
+                "PBR": pbr,
+                "ROE": roe,
+                "ROA": roa,
+                "PER": per,
+                "ICR": icr,
+                "EPS Growth": eps_growth,
+                "Div Growth": div_growth ,
+                "BVPS Growth": bvps_growth,
+                "B-Score": quantitative_buffet_score,
+            }
+            with data_lock:
+                data.append(result)
+        except Exception as e:
+            data.append({
+                "Ticker": ticker,
+                "Name": '',
+                "Sector": '',
+                "Price": 0,
+                "D/E": 0,
+                "CR": 0,
+                "PBR": 0,
+                "ROE": 0,
+                "ROA": 0,
+                "PER": 0,
+                "ICR": 0,
+                "EPS Growth": False,
+                "Div Growth":  False,
+                "BVPS Growth": False,
+                "B-Score": 0,
+            })
+        finally:
+            q.task_done()
+            time.sleep(0.5)
     
 
+
+# print(response.message.content[0].text)
+
+
+
 # Use multithreading to speed up
-with ThreadPoolExecutor(max_workers=num_thread) as executor: #1-20
-    futures = [executor.submit(process_ticker_quantitatives, ticker) for ticker in tickers]
-    for future in as_completed(futures):
-        data.append(future.result())
+num_threads = 10
+
+threads = []
+for _ in range(num_threads):
+    t = threading.Thread(target=process_ticker_quantitatives)
+    t.start()
+    threads.append(t)
+
+for t in threads:
+    t.join()
 
 df = pd.DataFrame(data)
 df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
