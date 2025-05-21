@@ -78,10 +78,10 @@ Be specific and concise. Use business evidence, not vague impressions. Avoid spe
 client = OpenAI()
 
 moat = {
-    3: "Unbreachable (3)",
-    2: "Strong (2)",
-    1: "Narrow (1)",
-    0: "None (0)"
+    3: "Unbreachable(+3)",
+    2: "Strong(+2)",
+    1: "Narrow(+1)",
+    0: "None(+0)"
 }
 
 def get_tickers(country: str, limit: int, sp500: bool):
@@ -349,8 +349,8 @@ def process_ticker_quantitatives():
                 "EPS Growth": eps_growth,
                 "Div Growth": div_growth ,
                 "BVPS Growth": bvps_growth,
-                "B-Score": quantitative_buffet_score,
-                "Moat": moat[moat_score],
+                "B-Score(9)": quantitative_buffet_score,
+                "Moat(3)": moat[moat_score],
                 "Total(12)": quantitative_buffet_score + moat_score
             }
             with data_lock:
@@ -371,8 +371,8 @@ def process_ticker_quantitatives():
                 "EPS Growth": False,
                 "Div Growth":  False,
                 "BVPS Growth": False,
-                "B-Score": 0,
-                "Moat": 0,
+                "B-Score(9)": 0,
+                "Moat(3)": 0,
                 "Total(12)": 0
 
             })
