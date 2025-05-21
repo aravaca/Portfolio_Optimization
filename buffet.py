@@ -62,6 +62,7 @@ When answering:
 - Search the web for **the most recent, relevant data**
 - Only use **neutral, fact-based, and highly reliable sources** like Bloomberg, Reuters, WSJ, Financial Times, investor relations pages, or annual reports
 - Ignore social media, biased blogs, promotional material, and wikipedias.
+- Return a single integer as the response output without any text explanation
 
 Analyze whether the company exhibits:
 - Brand strength
@@ -72,10 +73,16 @@ Analyze whether the company exhibits:
 - Dominant market share via efficient scale
 
 Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
-Return a single integer as the final output based on the final verdict.
 """
 
 client = OpenAI()
+
+moat = {
+    3: "Unbreachable(3)",
+    2: "Strong(2)",
+    1: "Narrow(1)",
+    0: "None(0)"
+}
 
 def get_tickers(country: str, limit: int, sp500: bool):
     if country is not None:
@@ -270,16 +277,18 @@ def process_ticker_quantitatives():
             # regulatory advantage(gov protection), patients(Pfizer, Intel)
 
             user_prompt = f"""
-            Search the web using trusted financial and business sources to evaluate the economic moat of the following company:
-
+            Search the web using trusted financial and business sources to evaluate the economic moat of the following company 
+            and only return an integer based on it as the output:
+            
             Company: {name}
             Sector: {sector}
-            Recent Metrics (ignore the metrics that are 0 or missing):
+            These are the recent metrics of the company {name} (ignore the metrics that are 0 or missing):
             - ROE: {roe}
             - ROA: {roa}
             - PBR: {pbr}
             - PER: {per}
-            Search for:
+
+            Search for the following:
             - Notable Assets: e.g. Patents, Ecosystem, Strong Brand
             - Customer Base: e.g. Mass market, Enterprises, Government
             - Consistency & Durability: e.g. Is the advantage sustainable over decades? Is it resilient through market cycles?
@@ -287,14 +296,22 @@ def process_ticker_quantitatives():
             - Customer Loyalty & Pricing Power: e.g. Do customers prefer the product despite higher prices?
             - Management Quality: e.g. Buffett prefers companies with "able and honest" managers who act in shareholders' interests and allocate capital wisely.
 
-            Analyze the following:
+            Analyze the following based on recent metrics and search result:
             1. Type of moat(s)
             2. How durable the moat is
             3. Key risks or threats
-            4. Final verdict: Strong / Medium / Weak moat — with justification
+            4. Final verdict: Unbreachable (Extremely rare, this level suggests an almost insurmountable advantage, often due to monopolistic control, 
+            proprietary technology, or network effects.)/ Strong (The company possesses strong, sustainable competitive advantages that are difficult to replicate.) / 
+            Narrow (The company has some advantages, but competitors can erode them over time./ 
+            No moat (The company has little to no lasting competitive advantage, making it vulnerable to competition.) — with justification
 
-            Return a single integer for Python as the response based on the final verdict. Return 2 if the company has a Strong moat, return 1 for Medium moat
-             and return 0 for Weak moat or no moat. 
+            **Return one of the following integers as the final output:**  
+            - `3` if the company has a **Unbreachable** moat  
+            - `2` if the company has a **Strong** moat  
+            - `1` if the company has a **Narrow** moat
+            - `0` if the company has a **No** moat or no moat  
+
+            The final output must be a single integer with no additional text. 
             """.strip()
 
             response = client.responses.create(
@@ -312,7 +329,10 @@ def process_ticker_quantitatives():
             }],
             )
 
-            print(name, response.output_text)
+            try:
+                moat_score = int(response.output_text)
+            except Exception as e:
+                moat_score = 0
 
             result = {
                 "Ticker": ticker,
@@ -330,6 +350,8 @@ def process_ticker_quantitatives():
                 "Div Growth": div_growth ,
                 "BVPS Growth": bvps_growth,
                 "B-Score": quantitative_buffet_score,
+                "Moat": moat[moat_score],
+                "Total": quantitative_buffet_score + moat_score
             }
             with data_lock:
                 data.append(result)
@@ -350,16 +372,14 @@ def process_ticker_quantitatives():
                 "Div Growth":  False,
                 "BVPS Growth": False,
                 "B-Score": 0,
+                "Moat": 0,
+                "Total": 0
+
             })
         finally:
             q.task_done()
             time.sleep(0.5)
     
-
-
-# print(response.message.content[0].text)
-
-
 
 # Use multithreading to speed up
 num_threads = 10
@@ -374,9 +394,9 @@ for t in threads:
     t.join()
 
 df = pd.DataFrame(data)
-df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
+# df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
-df_sorted = df.sort_values(by = "B-Score", ascending = False)
+df_sorted = df.sort_values(by = "Total", ascending = False)
 
 if country: 
     df_sorted.to_excel("result_" + country + ".xlsx", index=False)
