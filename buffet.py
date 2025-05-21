@@ -78,10 +78,10 @@ Be specific and concise. Use business evidence, not vague impressions. Avoid spe
 client = OpenAI()
 
 moat = {
-    3: "Unbreachable(3)",
-    2: "Strong(2)",
-    1: "Narrow(1)",
-    0: "None(0)"
+    3: "Unbreachable (3)",
+    2: "Strong (2)",
+    1: "Narrow (1)",
+    0: "None (0)"
 }
 
 def get_tickers(country: str, limit: int, sp500: bool):
@@ -251,8 +251,8 @@ def process_ticker_quantitatives():
         try:
             info = yf.Ticker(ticker).info
             name = info.get("longName") or info.get("shortName", ticker)
-            sector = info.get("sector", "N/A")
-            currentPrice = info.get("currentPrice", "N/A")
+            sector = info.get("sector", None)
+            currentPrice = info.get("currentPrice", None)
             debtToEquity = info.get('debtToEquity', None) # < 0.5
             debtToEquity = debtToEquity/100 if debtToEquity is not None else None
             currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
@@ -351,7 +351,7 @@ def process_ticker_quantitatives():
                 "BVPS Growth": bvps_growth,
                 "B-Score": quantitative_buffet_score,
                 "Moat": moat[moat_score],
-                "Total": quantitative_buffet_score + moat_score
+                "Total(12)": quantitative_buffet_score + moat_score
             }
             with data_lock:
                 data.append(result)
@@ -373,7 +373,7 @@ def process_ticker_quantitatives():
                 "BVPS Growth": False,
                 "B-Score": 0,
                 "Moat": 0,
-                "Total": 0
+                "Total(12)": 0
 
             })
         finally:
@@ -396,7 +396,7 @@ for t in threads:
 df = pd.DataFrame(data)
 # df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
-df_sorted = df.sort_values(by = "Total", ascending = False)
+df_sorted = df.sort_values(by = "Total(12)", ascending = False)
 
 if country: 
     df_sorted.to_excel("result_" + country + ".xlsx", index=False)
