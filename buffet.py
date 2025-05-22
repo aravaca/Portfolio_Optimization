@@ -12,11 +12,11 @@ import math
 from queue import Queue
 import threading
 import time
+import polars as pl
 
 # pip install -r requirements.txt
 
 country = input('Country (KR, JP, CH, UK 중 선택. 미국 S&P500 및 NASDAQ100 희망 시 US 입력): ').upper() # None or one of the following: KR, US, JP, CH, UK, ETC
-num_thread = 20
 if country == 'US': 
     country = None 
 
@@ -38,11 +38,6 @@ formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%
 dfKospi = stock.get_market_fundamental(formattedDate)
 data = []
 data_lock = threading.Lock()
-
-# Set Pandas to display all columns and rows
-pd.set_option('display.max_rows', None)  # To display all rows
-# pd.set_option('display.max_columns', None)  # To display all columns
-pd.set_option('display.max_colwidth', None)  # To prevent truncation of column values
 
 # Load environment variables from .env file
 load_dotenv()
@@ -88,7 +83,7 @@ def get_tickers(country: str, limit: int, sp500: bool):
     if country is not None:
         return get_tickers_by_country(country, limit, fmp_key) #US, JP, KR
     elif sp500:
-        return pd.read_csv("https://datahub.io/core/s-and-p-500-companies/r/constituents.csv")["Symbol"].tolist()
+        return pl.read_csv("https://datahub.io/core/s-and-p-500-companies/r/constituents.csv")["Symbol"].tolist()
     elif not sp500:
         nasdaq100_url = 'https://en.wikipedia.org/wiki/NASDAQ-100'
         nasdaq100 = pd.read_html(nasdaq100_url, header=0)[4] # Might need to adjust index (5th table on the page)
@@ -239,7 +234,6 @@ def has_stable_book_value_growth(ticker, sector: str):
 
 
 tickers = get_tickers(country, limit, sp500)
-# tickers = ['AAPL']
 
 q = Queue()
 for ticker in tickers:
@@ -314,25 +308,25 @@ def process_ticker_quantitatives():
             The final output must be a single integer with no additional text. 
             """.strip()
 
-            response = client.responses.create(
-            model="gpt-4o",
-            instructions=system_prompt,
-            input=user_prompt,
-            tools=[{
-                "type": "web_search_preview",
-                "user_location": {
-                    "type": "approximate",
-                    "country": "KR",
-                    "city": "Seoul",
-                    "region": "Seoul",
-                }
-            }],
-            )
+            # response = client.responses.create(
+            # model="gpt-4o",
+            # instructions=system_prompt,
+            # input=user_prompt,
+            # tools=[{
+            #     "type": "web_search_preview",
+            #     "user_location": {
+            #         "type": "approximate",
+            #         "country": "KR",
+            #         "city": "Seoul",
+            #         "region": "Seoul",
+            #     }
+            # }],
+            # )
 
-            try:
-                moat_score = int(response.output_text)
-            except Exception as e:
-                moat_score = 0
+            # try:
+            #     moat_score = int(response.output_text)
+            # except Exception as e:
+            #     moat_score = 0
 
             result = {
                 "Ticker": ticker,
@@ -350,40 +344,42 @@ def process_ticker_quantitatives():
                 "Div Growth": div_growth ,
                 "BVPS Growth": bvps_growth,
                 "B-Score(9)": quantitative_buffet_score,
-                "Moat(3)": moat[moat_score],
-                "Total(12)": quantitative_buffet_score + moat_score
+                # "Moat(3)": moat[moat_score],
+                # "Total(12)": quantitative_buffet_score + moat_score
             }
             with data_lock:
                 data.append(result)
         except Exception as e:
-            data.append({
-                "Ticker": ticker,
-                "Name": '',
-                "Sector": '',
-                "Price": 0,
-                "D/E": 0,
-                "CR": 0,
-                "PBR": 0,
-                "ROE": 0,
-                "ROA": 0,
-                "PER": 0,
-                "ICR": 0,
-                "EPS Growth": False,
-                "Div Growth":  False,
-                "BVPS Growth": False,
-                "B-Score(9)": 0,
-                "Moat(3)": 0,
-                "Total(12)": 0
-
-            })
+            if "429" in str(e):
+                print("Too many requests! Waiting 10 seconds...")
+                time.sleep(10)
+            # data.append({
+            #     "Ticker": ticker,
+            #     "Name": '',
+            #     "Sector": '',
+            #     "Price": 0,
+            #     "D/E": 0,
+            #     "CR": 0,
+            #     "PBR": 0,
+            #     "ROE": 0,
+            #     "ROA": 0,
+            #     "PER": 0,
+            #     "ICR": 0,
+            #     "EPS Growth": False,
+            #     "Div Growth":  False,
+            #     "BVPS Growth": False,
+            #     "B-Score(9)": 0,
+            #     "Moat(3)": 0,
+            #     "Total(12)": 0
+            # })
         finally:
             q.task_done()
-            time.sleep(0.5)
+            time.sleep(2)
     
 
 # Use multithreading to speed up
 num_threads = 10
-
+# try polars instead of pandas 
 threads = []
 for _ in range(num_threads):
     t = threading.Thread(target=process_ticker_quantitatives)
@@ -393,16 +389,16 @@ for _ in range(num_threads):
 for t in threads:
     t.join()
 
-df = pd.DataFrame(data)
+df = pl.DataFrame(data)
 # df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
-df_sorted = df.sort_values(by = "Total(12)", ascending = False)
+df_sorted = df.sort("B-Score(9)", descending = True)
 
 if country: 
-    df_sorted.to_excel("result_" + country + ".xlsx", index=False)
+    df_sorted.to_pandas().to_excel("result_" + country + ".xlsx", index=False)
 
 elif sp500:
-    df_sorted.to_excel("sp500.xlsx", index=False)
+    df_sorted.to_pandas().to_excel("sp500.xlsx", index=False)
 else:
-    df_sorted.to_excel("nasdaq100.xlsx", index=False)
+    df_sorted.to_pandas().to_excel("nasdaq100.xlsx", index=False)
 
