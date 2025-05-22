@@ -13,6 +13,15 @@ from queue import Queue
 import threading
 import time
 import polars as pl
+from google import genai
+from google.genai import types
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
+
+model_id = "gemini-2.0-flash"
+
+google_search_tool = Tool(
+    google_search = GoogleSearch()
+)
 
 # pip install -r requirements.txt
 
@@ -43,34 +52,32 @@ data_lock = threading.Lock()
 load_dotenv()
 
 # Get the API key
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY")
 fmp_key = os.getenv("FMP_API_KEY")
 
 # Use it with OpenAI
-openai.api_key = api_key
+client = genai.Client(api_key=api_key)
 
-system_prompt = """
-You are a financial analyst AI trained in Warren Buffett’s investment style. Your task is to analyze a company's long-term competitive advantage (economic moat) 
-based on high-quality, trustworthy public information.
+# system_prompt = """
+# You are a financial analyst AI trained in Warren Buffett’s investment style. Your task is to analyze a company's long-term competitive advantage (economic moat) 
+# based on high-quality, trustworthy public information.
 
-When answering:
-- Search the web for **the most recent, relevant data**
-- Only use **neutral, fact-based, and highly reliable sources** like Bloomberg, Reuters, WSJ, Financial Times, investor relations pages, or annual reports
-- Ignore social media, biased blogs, promotional material, and wikipedias.
-- Return a single integer as the response output without any text explanation
+# When answering:
+# - Search the web for **the most recent, relevant data**
+# - Only use **neutral, fact-based, and highly reliable sources** like Bloomberg, Reuters, WSJ, Financial Times, investor relations pages, or annual reports
+# - Ignore social media, biased blogs, promotional material, and wikipedias.
+# - Return a single integer as the response output without any text explanation
 
-Analyze whether the company exhibits:
-- Brand strength
-- Network effects
-- Cost leadership
-- Switching costs
-- Intangible assets (e.g., patents, licensing)
-- Dominant market share via efficient scale
+# Analyze whether the company exhibits:
+# - Brand strength
+# - Network effects
+# - Cost leadership
+# - Switching costs
+# - Intangible assets (e.g., patents, licensing)
+# - Dominant market share via efficient scale
 
-Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
-"""
-
-client = OpenAI()
+# Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
+# """
 
 moat = {
     3: "Unbreachable(+3)",
@@ -270,9 +277,29 @@ def process_ticker_quantitatives():
             # ex) brand power(Coca-Cola), network effect(Facebook, Visa), cost advantage(Walmart, Costco), high switching costs(Adobe),
             # regulatory advantage(gov protection), patients(Pfizer, Intel)
 
+
+            # - Return a single integer as the response output without any text explanation
+             
             user_prompt = f"""
-            Search the web using trusted financial and business sources to evaluate the economic moat of the following company 
-            and only return an integer based on it as the output:
+
+            You are a financial analyst AI trained in Warren Buffett’s investment style. Your task is to analyze a company's long-term competitive advantage (economic moat) 
+            based on high-quality, trustworthy public information.
+
+            When answering:
+            - Search the web for **the most recent, relevant data**
+            - Only use **neutral, fact-based, and highly reliable news sources** like Bloomberg, Reuters, WSJ, Financial Times.
+            - Ignore social media, biased blogs, promotional material, company websites, and wikipedias.
+
+            Analyze whether the company exhibits:
+            - Brand strength
+            - Network effects
+            - Cost leadership
+            - Switching costs
+            - Intangible assets (e.g., patents, licensing)
+            - Dominant market share via efficient scale
+
+            Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
+            Search the web using trusted financial and business sources to evaluate the economic moat of the following company:
             
             Company: {name}
             Sector: {sector}
@@ -305,29 +332,22 @@ def process_ticker_quantitatives():
             - `1` if the company has a **Narrow** moat
             - `0` if the company has a **No** moat or no moat  
 
-            The final output must be a single integer with no additional text. 
+            The final output must be concise bullet points of the verdict/evidence with citation (e.g. Reference: Bloomberg, article date: April 5th, 2025) 
+            and a single integer with no additional text. 
             """.strip()
 
-            # response = client.responses.create(
-            # model="gpt-4o",
-            # instructions=system_prompt,
-            # input=user_prompt,
-            # tools=[{
-            #     "type": "web_search_preview",
-            #     "user_location": {
-            #         "type": "approximate",
-            #         "country": "KR",
-            #         "city": "Seoul",
-            #         "region": "Seoul",
-            #     }
-            # }],
-            # )
 
-            # try:
-            #     moat_score = int(response.output_text)
-            # except Exception as e:
-            #     moat_score = 0
+            response = client.models.generate_content(
+            model=model_id,
+            config=GenerateContentConfig(
+                tools=[google_search_tool],
+                response_modalities=["TEXT"],
+            ),
+            contents=user_prompt)
 
+            for each in response.candidates[0].content.parts:
+                print(each.text)
+            
             result = {
                 "Ticker": ticker,
                 "Name": name,
@@ -353,25 +373,25 @@ def process_ticker_quantitatives():
             if "429" in str(e):
                 print("Too many requests! Waiting 10 seconds...")
                 time.sleep(10)
-            # data.append({
-            #     "Ticker": ticker,
-            #     "Name": '',
-            #     "Sector": '',
-            #     "Price": 0,
-            #     "D/E": 0,
-            #     "CR": 0,
-            #     "PBR": 0,
-            #     "ROE": 0,
-            #     "ROA": 0,
-            #     "PER": 0,
-            #     "ICR": 0,
-            #     "EPS Growth": False,
-            #     "Div Growth":  False,
-            #     "BVPS Growth": False,
-            #     "B-Score(9)": 0,
-            #     "Moat(3)": 0,
-            #     "Total(12)": 0
-            # })
+            data.append({
+                "Ticker": ticker,
+                "Name": '',
+                "Sector": '',
+                "Price": 0,
+                "D/E": 0,
+                "CR": 0,
+                "PBR": 0,
+                "ROE": 0,
+                "ROA": 0,
+                "PER": 0,
+                "ICR": 0,
+                "EPS Growth": False,
+                "Div Growth":  False,
+                "BVPS Growth": False,
+                "B-Score(9)": 0,
+                # "Moat(3)": 0,
+                # "Total(12)": 0
+            })
         finally:
             q.task_done()
             time.sleep(2)
