@@ -1,0 +1,3 @@
+# "consumer price index" OR "CPI" OR "core inflation" OR "wage inflation" OR "input costs" OR "Federal Reserve" OR "interest rate hike" OR "rate cut" OR "bond yields" OR "monetary tightening" OR "consumer confidence" OR "retail sales" OR "credit card spending" OR "household debt" OR "unemployment claims" OR "job openings" OR "labor participation" OR "wage pressure" OR "earnings revision" OR "profit warning" OR "guidance" OR "cost-cutting" OR "inverted yield curve" OR "economic slowdown" OR "GDP contraction" OR "recession risk" OR "stagflation" OR "bubble" OR "overvalued" OR "high P/E" OR "meme stock" OR "geopolitical tension" OR "trade war" OR "supply chain disruption" OR "currency devaluation"
+import datetime as dt
+print(dt.datetime.today())

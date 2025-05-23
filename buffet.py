@@ -1,13 +1,12 @@
 import yfinance as yf
 import pandas as pd
-import openai
-from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import requests
 from pykrx import stock
 import datetime as dt
 import openpyxl
+import textwrap
 import math
 from queue import Queue
 import threading
@@ -16,16 +15,18 @@ import polars as pl
 from google import genai
 from google.genai import types
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
+# pip install -r requirements.txt
 
-model_id = "gemini-2.0-flash"
+model_id = "gemini-2.5-flash-preview-04-17" # 05-20
 
 google_search_tool = Tool(
     google_search = GoogleSearch()
 )
 
-# pip install -r requirements.txt
+# Use multithreading to speed up
+num_threads = 5 #5 worked just fine for limit=50
 
-country = input('Country (KR, JP, CH, UK 중 선택. 미국 S&P500 및 NASDAQ100 희망 시 US 입력): ').upper() # None or one of the following: KR, US, JP, CH, UK, ETC
+country = input('Country (KR, JP, CH, US, UK 중 선택): ').upper() 
 if country == 'US': 
     country = None 
 
@@ -39,14 +40,20 @@ if not country:
 else:
     sp500 = True
 
+# moat_only = input('Analyze moat only? (y/n): ').lower().strip() == 'y'
+
 print('May take up to few minutes...')
 
-weekend = dt.datetime.today().weekday() - 4 # returns 1 for saturday, 2 for sunday
-formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if dt.datetime.today().weekday() >= 5 else dt.datetime.today().strftime("%Y%m%d")
+today = dt.datetime.today().weekday()
+weekend = today - 4 # returns 1 for saturday, 2 for sunday
+formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if today >= 5 else dt.datetime.today().strftime("%Y%m%d")
 
-dfKospi = stock.get_market_fundamental(formattedDate)
+dfKospi = stock.get_market_fundamental(formattedDate, market="ALL")
+
 data = []
 data_lock = threading.Lock()
+
+moat_data = []
 
 # Load environment variables from .env file
 load_dotenv()
@@ -57,27 +64,6 @@ fmp_key = os.getenv("FMP_API_KEY")
 
 # Use it with OpenAI
 client = genai.Client(api_key=api_key)
-
-# system_prompt = """
-# You are a financial analyst AI trained in Warren Buffett’s investment style. Your task is to analyze a company's long-term competitive advantage (economic moat) 
-# based on high-quality, trustworthy public information.
-
-# When answering:
-# - Search the web for **the most recent, relevant data**
-# - Only use **neutral, fact-based, and highly reliable sources** like Bloomberg, Reuters, WSJ, Financial Times, investor relations pages, or annual reports
-# - Ignore social media, biased blogs, promotional material, and wikipedias.
-# - Return a single integer as the response output without any text explanation
-
-# Analyze whether the company exhibits:
-# - Brand strength
-# - Network effects
-# - Cost leadership
-# - Switching costs
-# - Intangible assets (e.g., patents, licensing)
-# - Dominant market share via efficient scale
-
-# Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
-# """
 
 moat = {
     3: "Unbreachable(+3)",
@@ -105,7 +91,7 @@ def get_tickers_by_country(country: str, limit: int = 100, apikey: str = 'your_a
         'limit': limit,
         'type': 'stock',
         'sort': 'marketCap',
-        # 'order': 'desc',
+        'order': 'desc',
         'apikey': apikey,
         'isEtf': False,
         'isFund': False,
@@ -116,6 +102,7 @@ def get_tickers_by_country(country: str, limit: int = 100, apikey: str = 'your_a
     data = response.json()
     return [item['symbol'] for item in data]
 
+# buffet's philosophy
 def buffet_score (de, cr, pbr, roe, roa, eps, div, bvps, icr):
     score = 0
     if de is not None and de <= 0.5:
@@ -282,60 +269,56 @@ def process_ticker_quantitatives():
              
             user_prompt = f"""
 
-            You are a financial analyst AI trained in Warren Buffett’s investment style. Your task is to analyze a company's long-term competitive advantage (economic moat) 
-            based on high-quality, trustworthy public information.
+            You are a financial analysis AI trained in the style of Warren Buffett's long-term investment philosophy. Your mission is to use **web search capabilities** to analyze the long-term competitive advantage (economic moat) of {name}, strictly based on **credible, reputable, and fact-based news sources**.
 
-            When answering:
-            - Search the web for **the most recent, relevant data**
-            - Only use **neutral, fact-based, and highly reliable news sources** like Bloomberg, Reuters, WSJ, Financial Times.
-            - Ignore social media, biased blogs, promotional material, company websites, and wikipedias.
+            **Before conducting the analysis, you must use the web tool to search for the most recent data from the following sources only:**
+            * Bloomberg, Reuters, The Wall Street Journal, CNBC, Yahoo Finance, Korea Economic Daily, Maeil Business Newspaper, Yonhap News, Chosun Ilbo, JoongAng Ilbo, Financial Times, The Economist, Nikkei Asia
 
-            Analyze whether the company exhibits:
-            - Brand strength
-            - Network effects
-            - Cost leadership
-            - Switching costs
-            - Intangible assets (e.g., patents, licensing)
-            - Dominant market share via efficient scale
+            **Strictly prohibited sources for web search:**
+            * Social media, personal blogs, promotional material, Wikipedia, any websites that include the company name ({name}) in the domain (e.g., {name}.com)
 
-            Be specific and concise. Use business evidence, not vague impressions. Avoid speculation.
-            Search the web using trusted financial and business sources to evaluate the economic moat of the following company:
-            
-            Company: {name}
-            Sector: {sector}
-            These are the recent metrics of the company {name} (ignore the metrics that are 0 or missing):
-            - ROE: {roe}
-            - ROA: {roa}
-            - PBR: {pbr}
-            - PER: {per}
+            **Do not use any data that does not clearly cite a source.**
 
-            Search for the following:
-            - Notable Assets: e.g. Patents, Ecosystem, Strong Brand
-            - Customer Base: e.g. Mass market, Enterprises, Government
-            - Consistency & Durability: e.g. Is the advantage sustainable over decades? Is it resilient through market cycles?
-            - Cash Flow and Free Cash Flow
-            - Customer Loyalty & Pricing Power: e.g. Do customers prefer the product despite higher prices?
-            - Management Quality: e.g. Buffett prefers companies with "able and honest" managers who act in shareholders' interests and allocate capital wisely.
+            **Every piece of information must include its source and date in parentheses.**
+            Example: (Bloomberg, 2025.05.22)
 
-            Analyze the following based on recent metrics and search result:
-            1. Type of moat(s)
-            2. How durable the moat is
+            ---
+
+            ### Criteria for Analysis:
+
+            1. Brand strength
+            2. Network effects
+            3. Cost advantage
+            4. Switching costs
+            5. Intangible assets (e.g., patents, licenses)
+            6. Economies of scale and market dominance
+
+            ---
+
+            ### Investigate the following factors:
+
+            * **Key assets** (e.g., patents, ecosystem, strong brand)
+            * **Customer base** (e.g., mass market, enterprises, governments)
+            * **Consistency and durability** (e.g., can this advantage last for decades? Is it resilient across economic cycles?)
+            * **Cash flow and free cash flow**
+            * **Customer loyalty and pricing power** (e.g., does the customer prefer the product even at higher prices?)
+            * **Quality of management** (Buffett favors “able and honest” managers who align with shareholders and allocate capital wisely)
+
+            ---
+
+            ### Evaluation Criteria:
+
+            1. Type of moat
+            2. Durability of the moat
             3. Key risks or threats
-            4. Final verdict: Unbreachable (Extremely rare, this level suggests an almost insurmountable advantage, often due to monopolistic control, 
-            proprietary technology, or network effects.)/ Strong (The company possesses strong, sustainable competitive advantages that are difficult to replicate.) / 
-            Narrow (The company has some advantages, but competitors can erode them over time./ 
-            No moat (The company has little to no lasting competitive advantage, making it vulnerable to competition.) — with justification
+            4. Final rating:
 
-            **Return one of the following integers as the final output:**  
-            - `3` if the company has a **Unbreachable** moat  
-            - `2` if the company has a **Strong** moat  
-            - `1` if the company has a **Narrow** moat
-            - `0` if the company has a **No** moat or no moat  
+            * `3`: **Unbreachable** : Extremely rare; based on monopolistic position, proprietary technology, or powerful network effects
+            * `2`: **Strong** : Sustainable and hard-to-replicate competitive advantage
+            * `1`: **Narrow** : Some edge, but likely to weaken over time
+            * `0`: **No moat** : Little or no sustainable advantage; easily exposed to competition
 
-            The final output must be concise bullet points of the verdict/evidence with citation (e.g. Reference: Bloomberg, article date: April 5th, 2025) 
-            and a single integer with no additional text. 
             """.strip()
-
 
             response = client.models.generate_content(
             model=model_id,
@@ -345,9 +328,35 @@ def process_ticker_quantitatives():
             ),
             contents=user_prompt)
 
-            for each in response.candidates[0].content.parts:
-                print(each.text)
-            
+            #for each in response.candidates[0].content.parts:
+            #    print(each.text)
+
+
+            # 줄 단위로 나눈 후, 각각에 대해 줄바꿈 적용
+            wrapped_lines = []
+            for line in response.text.strip().split('\n'):
+                # 줄의 시작 공백(들여쓰기) 보존
+                leading_spaces = len(line) - len(line.lstrip(' '))
+                indent = ' ' * leading_spaces
+
+                # bullet 유지되도록 첫 단어 확인
+                if line.lstrip().startswith(("-", "*", "•")) or line.lstrip()[:2].isdigit():
+                    first_word = line.split()[0]
+                    rest = ' '.join(line.split()[1:])
+                    wrapped = textwrap.fill(rest, width=130 - len(indent) - len(first_word) - 1,
+                                            initial_indent=indent + first_word + ' ',
+                                            subsequent_indent=indent + ' ' * (len(first_word) + 1))
+                else:
+                    wrapped = textwrap.fill(line, width=130,
+                                            initial_indent=indent,
+                                            subsequent_indent=indent)
+                wrapped_lines.append(wrapped)
+
+            # 최종 텍스트
+            ai_moat = '\n'.join(wrapped_lines)
+
+            # ai_moat = ''
+
             result = {
                 "Ticker": ticker,
                 "Name": name,
@@ -364,18 +373,22 @@ def process_ticker_quantitatives():
                 "Div Growth": div_growth ,
                 "BVPS Growth": bvps_growth,
                 "B-Score(9)": quantitative_buffet_score,
-                # "Moat(3)": moat[moat_score],
-                # "Total(12)": quantitative_buffet_score + moat_score
+            }
+
+            moat_result = {
+                "점수": quantitative_buffet_score,
+                "Insight": ai_moat,
             }
             with data_lock:
                 data.append(result)
+                moat_data.append(moat_result)
         except Exception as e:
             if "429" in str(e):
                 print("Too many requests! Waiting 10 seconds...")
                 time.sleep(10)
             data.append({
                 "Ticker": ticker,
-                "Name": '',
+                "Name": name,
                 "Sector": '',
                 "Price": 0,
                 "D/E": 0,
@@ -389,18 +402,19 @@ def process_ticker_quantitatives():
                 "Div Growth":  False,
                 "BVPS Growth": False,
                 "B-Score(9)": 0,
-                # "Moat(3)": 0,
-                # "Total(12)": 0
+            })
+
+            moat_data.append({
+                "점수": 0,
+                "Insight": '',
             })
         finally:
             q.task_done()
             time.sleep(2)
     
 
-# Use multithreading to speed up
-num_threads = 10
-# try polars instead of pandas 
 threads = []
+
 for _ in range(num_threads):
     t = threading.Thread(target=process_ticker_quantitatives)
     t.start()
@@ -410,15 +424,20 @@ for t in threads:
     t.join()
 
 df = pl.DataFrame(data)
+moat_df = pl.DataFrame(moat_data)
 # df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
 df_sorted = df.sort("B-Score(9)", descending = True)
+moat_df_sorted = moat_df.sort("점수", descending = True)
 
 if country: 
     df_sorted.to_pandas().to_excel("result_" + country + ".xlsx", index=False)
+    moat_df_sorted.to_pandas().to_excel("moat_analysis_" + country + ".xlsx", index=False)
 
 elif sp500:
     df_sorted.to_pandas().to_excel("sp500.xlsx", index=False)
+    moat_df_sorted.to_pandas().to_excel("moat_analysis_sp500.xlsx", index=False)
 else:
     df_sorted.to_pandas().to_excel("nasdaq100.xlsx", index=False)
+    moat_df_sorted.to_pandas().to_excel("moat_analysis_nasdaq100.xlsx", index=False)
 
