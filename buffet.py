@@ -156,6 +156,29 @@ def has_stable_eps_growth(ticker):
         return False
 
 
+def has_stable_eps_growth_quarterly(ticker):
+    ticker = yf.Ticker(ticker)
+
+    # Get quarterly earnings data (contains actual EPS in 'Earnings' column)
+    quarterly_eps = ticker.quarterly_earnings
+
+    # Make sure there is enough data
+    if quarterly_eps is None or quarterly_eps.empty or len(quarterly_eps) < 8:
+        return False
+
+    # Sort by date ascending (oldest first)
+    quarterly_eps = quarterly_eps.sort_index()
+
+    eps_list = quarterly_eps['Earnings'].dropna().tolist()
+
+    # Define tolerance for stable growth (e.g., each quarter at least 90% of previous)
+    tolerance = 0.9
+
+    # Check stable growth: every EPS >= 90% of previous EPS
+    return all(earlier * tolerance <= later for earlier, later in zip(eps_list, eps_list[1:]))
+
+
+
 # gets the most recent interest coverage ratio available
 def get_interest_coverage_ratio(ticker):
     financials = yf.Ticker(ticker).financials # Annual financials, columns = dates (most recent first)
@@ -221,23 +244,46 @@ def process_ticker_quantitatives():
             info = yf.Ticker(ticker).info
             name = info.get("longName") or info.get("shortName", ticker)
             sector = info.get("sector", None)
+            industry = info.get("industry", None)
             currentPrice = info.get("currentPrice", None)
+            target_mean = info.get('targetMeanPrice', 0)
+            if target_mean != 0:
+                upside = str(round(((target_mean - currentPrice) / currentPrice) * 100)) + '%'
+            else: 
+                upside = 'N/A'
+            
             debtToEquity = info.get('debtToEquity', None) # < 0.5
             debtToEquity = debtToEquity/100 if debtToEquity is not None else None
-            currentRatio = info.get('currentRatio', None) # > 1.5 && < 2.5
-            pbr = info.get('priceToBook', None) # 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
-            if not pbr and country == 'KR': pbr = getFs('PBR', ticker)
-
-            roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) && consistent/incr over the last 10y
-            roa = info.get('returnOnAssets', None) # > 6% (0.06) 
-            per = info.get('trailingPE', None) # 저per 종목 선별, price investors are willing to pay for $1 of a company's earnings, 
-            if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued. low per could be undervalued or company in trouble
+            currentRatio = info.get('currentRatio', None) # 초점: 회사의 단기 유동성, > 1.5 && < 2.5
             
-            eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, # 저per 종목 선별, Buffet looks for stable EPS growth
+            pbr = info.get('priceToBook', None) # 초점: 자산가치, 저pbr종목은 저평가된 자산 가치주로 간주. 장기 수익률 설명력 높음 < 1.5 (=being traded at 1.5 times its book value (asset-liab))
+            if not pbr and country == 'KR': pbr = getFs('PBR', ticker) # 주가가 그 기업의 자산가치에 비해 과대/과소평가되어 있다는 의미. 낮으면 자산활용력 부족
+            per = info.get('trailingPE', None) # 초점: 수익성, over/undervalue? 저per 종목 선별, 10-20전후(혹은 산업평균)로 낮고 높음 구분. 주가가 그 기업의 이익에 비해 과대/과소평가되어 있다는 의미
+            if not per and country == 'KR': per = getFs('PER', ticker) # high per expects future growth but could be overvalued(=버블). 
+                                                                       # low per could be undervalued or company in trouble, IT, 바이오 등 성장산업은 자연스레 per이 높게 형성
+                                                                       # 저per -> 수익성 높거나 주가가 싸다 고pbr -> 자산은 적은데 시장에서 비싸게 봐준다
+
+            roe = info.get('returnOnEquity', None) # 수익성 높은 기업 선별. 고roe + 저pbr 조합은 가장 유명한 퀀트 전략. > 8% (0.08) 주주 입장에서 수익성
+            roa = info.get('returnOnAssets', None) # > 6% (0.06), 기업 전체 효율성
+            #ROE가 높고 ROA는 낮다면? → 부채를 많이 이용해 수익을 낸 기업일 수 있음. ROE와 ROA 모두 높다면? → 자산과 자본 모두 효율적으로 잘 운용하고 있다는 의미.
+            #A = L + E
+            
+            eps_growth = has_stable_eps_growth(ticker) # earnings per share, the higher the better, Buffet looks for stable EPS growth
+            # eps_growth_quart = has_stable_eps_growth_quarterly(ticker) 
             div_growth = has_stable_dividend_growth(ticker) # Buffet looks for stable dividend growth for at least 10 years
             bvps_growth = has_stable_book_value_growth(ticker, sector)
+            
             icr = get_interest_coverage_ratio(ticker)
+
             quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
+
+            rec = info.get('recommendationKey', None)
+            # try:
+            #     sust = ticker.sustainability.loc['totalEsg']
+            #     rateY = ticker.sustainability.loc['ratingYear']
+            # except Exception:
+            #     sust = ''
+            #     rateY = ''
 
             ## FOR extra 10 score:::
             # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
@@ -248,19 +294,21 @@ def process_ticker_quantitatives():
             result = {
                 "Ticker": ticker,
                 "Name": name,
-                "Sector": sector,
-                "Price": currentPrice,
+                "Industry": industry,
+                "Price(T)": str(f"{currentPrice:,.0f}") + ' (' + upside + ')',
                 "D/E": debtToEquity,
                 "CR": currentRatio,
-                "PBR": pbr,
-                "ROE": roe,
-                "ROA": roa,
+                "P/B": pbr,
                 "PER": per,
+                "ROE": str(round(roe*100,2)) + '%',
+                "ROA": str(round(roa*100,2)) + '%',
                 "ICR": icr,
-                "EPS Growth": eps_growth,
+                "EPS Growth": eps_growth, #use this instead of operating income incrs for quart/annual
                 "Div Growth": div_growth ,
                 "BVPS Growth": bvps_growth,
                 "B-Score(9)": quantitative_buffet_score,
+                'Analysts Op.': rec,
+                # 'ESG': sust + '(' + rateY + ')',
             }
 
             with shelve.open("company_cache") as cache:
@@ -276,19 +324,21 @@ def process_ticker_quantitatives():
             data.append({
                 "Ticker": ticker,
                 "Name": name,
-                "Sector": '',
-                "Price": 0,
+                "Industry": '',
+                "Price(T)": '',
                 "D/E": 0,
                 "CR": 0,
-                "PBR": 0,
+                "P/B": 0,
+                "PER": 0,
                 "ROE": 0,
                 "ROA": 0,
-                "PER": 0,
                 "ICR": 0,
                 "EPS Growth": False,
                 "Div Growth":  False,
                 "BVPS Growth": False,
                 "B-Score(9)": 0,
+                'Analysts Op.': '',
+                # 'ESG': '',
             })
 
         finally:
@@ -307,7 +357,7 @@ for t in threads:
     t.join()
 
 df = pl.DataFrame(data)
-# df.dropna(subset=["D/E", "CR", "PBR", "ROE", "ROA", "PER", "ICR"], inplace = True)
+# df.dropna(subset=["D/E", "CR", "P/B", "ROE", "ROA", "PER", "ICR"], inplace = True)
 
 df_sorted = df.sort("B-Score(9)", descending = True)
 

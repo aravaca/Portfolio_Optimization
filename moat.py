@@ -148,7 +148,7 @@ def process_moat():
 
             result = {
                 "기업": name,
-                "점수(9)": score,
+                "퀀트점수(9)": score,
                 "분석": ai_generated_moat,
             }
 
@@ -161,7 +161,7 @@ def process_moat():
                 time.sleep(10)
             data.append({
                 "기업": name,
-                "점수(9)": 0,
+                "퀀트점수(9)": 0,
                 "분석": '',
             })
 
@@ -182,7 +182,7 @@ for t in threads:
 
 df = pl.DataFrame(data)
 
-df_sorted = df.sort("점수(9)", descending = True)
+df_sorted = df.sort("퀀트점수(9)", descending = True)
 
 df_sorted.to_pandas().to_excel("moat_analysis.xlsx", index=False)
 
