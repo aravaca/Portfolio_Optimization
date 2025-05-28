@@ -230,6 +230,40 @@ def has_stable_book_value_growth(ticker, sector: str):
     tolerance = 0.85 if sector in {'Industrials', 'Technology', 'Energy', 'Consumer Cyclical', 'Basic Materials'} else 0.9 #set is faster than list in checking O(1) avg
     return all(earlier * tolerance <= later for earlier, later in zip(book_values, book_values[1:]))
 
+def get_esg_score(ticker):
+    ans = ''
+    ticker = yf.Ticker(ticker)
+    esg = ticker.sustainability
+    try:
+        sust = esg.loc['totalEsg', 'esgScores']
+        rateY = esg.loc['esgPerformance', 'esgScores']
+        ans = str(sust) + ', ' + str(rateY)
+    except Exception:
+        return ans
+    finally:
+        return ans
+
+def get_percentage_change(ticker):
+    ticker = yf.Ticker(ticker)
+
+    # Get last 2 days of price data
+    data = ticker.history(period="2d")
+
+    # Check if we have at least 2 days and prev_close is not zero
+    if len(data) >= 2:
+        prev_close = data['Close'].iloc[-2]
+        last_close = data['Close'].iloc[-1]
+
+        if prev_close != 0:
+            percent_change = ((last_close - prev_close) / prev_close) * 100
+            if percent_change >= 0:
+                return (f" (+{percent_change:.2f}%)")  # e.g., (-6.20%)
+            else:
+                return (f" ({percent_change:.2f}%)")  # e.g., (-6.20%)
+        else:
+            return ' ()'
+    else:
+        return ' ()'
 
 tickers = get_tickers(country, limit, sp500)
 
@@ -246,9 +280,11 @@ def process_ticker_quantitatives():
             sector = info.get("sector", None)
             industry = info.get("industry", None)
             currentPrice = info.get("currentPrice", None)
+            percentage_change = get_percentage_change(ticker)
             target_mean = info.get('targetMeanPrice', 0)
-            if target_mean != 0:
-                upside = str(round(((target_mean - currentPrice) / currentPrice) * 100)) + '%'
+            if target_mean != 0 and (currentPrice != 0 and currentPrice is not None):
+                target_incr = ((target_mean - currentPrice) / currentPrice) * 100
+                upside = str(round(target_incr)) + '%' if target_incr < 0 else '+' + str(round(target_incr)) + '%'
             else: 
                 upside = 'N/A'
             
@@ -278,12 +314,11 @@ def process_ticker_quantitatives():
             quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, roe, roa, eps_growth, div_growth, bvps_growth, icr)
 
             rec = info.get('recommendationKey', None)
-            # try:
-            #     sust = ticker.sustainability.loc['totalEsg']
-            #     rateY = ticker.sustainability.loc['ratingYear']
-            # except Exception:
-            #     sust = ''
-            #     rateY = ''
+            if country is None:
+                esg = get_esg_score(ticker)
+            else:
+                esg = ''
+                
 
             ## FOR extra 10 score:::
             # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
@@ -295,7 +330,7 @@ def process_ticker_quantitatives():
                 "Ticker": ticker,
                 "Name": name,
                 "Industry": industry,
-                "Price(T)": str(f"{currentPrice:,.0f}") + ' (' + upside + ')',
+                "Price": f"{currentPrice:,.0f}" + percentage_change if country == 'KR' or country == 'JP' else f"{currentPrice:,.2f}" + percentage_change,
                 "D/E": debtToEquity,
                 "CR": currentRatio,
                 "P/B": pbr,
@@ -307,8 +342,8 @@ def process_ticker_quantitatives():
                 "Div Growth": div_growth ,
                 "BVPS Growth": bvps_growth,
                 "B-Score(9)": quantitative_buffet_score,
-                'Analysts Op.': rec,
-                # 'ESG': sust + '(' + rateY + ')',
+                'Analysts(Tgt)': rec + '(' + upside + ')',
+                'ESG': esg
             }
 
             with shelve.open("company_cache") as cache:
@@ -325,7 +360,7 @@ def process_ticker_quantitatives():
                 "Ticker": ticker,
                 "Name": name,
                 "Industry": '',
-                "Price(T)": '',
+                "Price": '',
                 "D/E": 0,
                 "CR": 0,
                 "P/B": 0,
@@ -337,8 +372,8 @@ def process_ticker_quantitatives():
                 "Div Growth":  False,
                 "BVPS Growth": False,
                 "B-Score(9)": 0,
-                'Analysts Op.': '',
-                # 'ESG': '',
+                'Analysts(Tgt)': '',
+                'ESG': '',
             })
 
         finally:
