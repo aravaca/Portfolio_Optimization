@@ -676,11 +676,11 @@ def process_ticker_quantitatives():
 
             cyclicality = 0
             # ACTIVATE THE CODE BELOW TO SCORE CYCLICALITY DEPENDING ON CURRENT MACROECON SITUATION
-            # classification = classify_cyclicality(industry)
-            # if classification == 'defensive':
-            #     cyclicality +=1
-            # elif classification == 'cyclical':
-            #     cyclicality -=0.5
+            classification = classify_cyclicality(industry)
+            if classification == 'defensive':
+                cyclicality +=1
+            elif classification == 'cyclical':
+                cyclicality -=0.5
 
 
             quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, per, industry_per, roe, industry_roe, roa, industry_roa, eps_growth, div_growth, icr) + momentum_score(short_momentum, mid_momentum, long_momentum) + cyclicality

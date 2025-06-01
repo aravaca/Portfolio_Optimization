@@ -21,12 +21,12 @@ def classify_cyclicality(industry):
     "auto", "apparel", "footwear", "home improvement", "internet retail", "leisure", "lodging",
     "restaurant", "specialty retail", "textile", "travel", "coal", "oil", "gas", "renewable",
     "asset management", "bank", "capital markets", "credit services", "insurance",
-    "mortgage", "real estate", "aerospace", "defense", "air freight", "airline",
+    "mortgage", "real estate", "aerospace", "defense", "freight", "logistics", "airline",
     "building", "conglomerate", "construction", "electrical equipment", "engineering",
     "industrial", "machinery", "marine", "railroad", "waste", "chemical", "container",
     "metal", "paper", "advertising", "broadcasting", "cable", "casino", "communication",
     "gaming", "interactive media", "movies", "publishing", "radio", "recreational",
-    "software", "semiconductor", "information technology", "it services"
+    "software", "semiconductor", "information technology", "it services", "steel"
     ]
 
 
