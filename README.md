@@ -82,24 +82,27 @@ You can choose from the following countries when prompted:
 ```bash
 python buffet.py
 ```
+Limit should be the number of tickers to process. 
+100 tickers take less than a minute and going over 500 could take up to a few minutes.
 ```vbnet
 Country (KR, JP, CH, US, UK 중 선택): KR
-Limit: 50
+Limit: 50 
 May take up to few minutes...
 ```
 
 ## Built With
-yfinance
+yfinance...for data retrieval on global and Korean markets
 
-FMP API
+FMP API...for data retrieval on global and Korean markets (free API required)
 
-Naver Finance
+Naver Finance...for data retrieval on Korean markets
 
-pykrx
+pykrx...for data retrieval on Korean markets
 
-Polars
+Polars...for faster data processing and aggregation compared to pandas
+      ...utilizes multithreading and is memory-efficient on large datasets unlike pandas
 
-BeautifulSoup
+BeautifulSoup...for web scraping from Naver Finance
 
 
 ## 📁 Output
