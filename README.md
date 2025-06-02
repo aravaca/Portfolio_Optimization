@@ -1,4 +1,4 @@
-# 📊 Buffett-Style Stock Screener (Global + Korean Markets)
+# 📊 Buffett-Style Quant Stock Screener (Global + Korean Markets)
 
 This Python program screens and scores stocks using **Buffett-style value investing principles**. It gathers financial data from:
 
@@ -55,7 +55,7 @@ The program assigns a score to each stock based on Warren Buffett’s value inve
 | Price-to-Book (P/B) | ≤ 1.5 and ≠ 0                                                  | +1                  |
 | Return on Equity    | ≥ 8%                                                           | +1                  |
 | Return on Assets    | ≥ 6%                                                           | +1                  |
-| Dividend Yield      | ≥ 10% → +1.5, ≥ 8% → +1, ≥ 6% → +0.5                           | +0.5 ~ +1.5         |
+| Dividend Yield CAGR (10Y) | ≥ 10% → +1.5, ≥ 8% → +1, ≥ 6% → +0.5                           | +0.5 ~ +1.5         |
 | EPS Trend           | Positive 3Y CAGR or strong growth                              | +1                  |
 | PEG Ratio           | PEG < 1 (if EPS & PER available)                              | +1                  |
 | Interest Coverage   | ≥ 5x                                                           | +1                  |
