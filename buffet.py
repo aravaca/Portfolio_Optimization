@@ -19,7 +19,7 @@ from urllib.request import urlopen
 
 # Use multithreading to speed up
 num_threads = 20 #5 worked just fine for limit=50
-
+CUTOFF = 5
 country = input('Country (KR, JP, CH, US, UK 중 선택): ').upper() 
 if country == 'US': 
     country = None 
@@ -543,7 +543,7 @@ def get_momentum_batch(tickers, period_days=126):
 
 momentum_3m = get_momentum_batch(tickers, 63)
 momentum_6m = get_momentum_batch(tickers, 126)
-momentum_12m = get_momentum_batch(tickers, 252)
+momentum_12m = get_momentum_batch(tickers, 240)
 
 def momentum_score(short, mid, long):
    
@@ -557,7 +557,7 @@ def momentum_score(short, mid, long):
         else:
             return 0
     
-    weights = {'short': 0.2, 'mid': 0.5, 'long': 1.3}
+    weights = {'short': 0.3, 'mid': 0.5, 'long': 1.2}
     thresholds = {
         'short': (0.05, -0.05),   # +5% / -5%
         'mid': (0.10, -0.05),     # +10% / -5%
@@ -676,11 +676,11 @@ def process_ticker_quantitatives():
 
             cyclicality = 0
             # ACTIVATE THE CODE BELOW TO SCORE CYCLICALITY DEPENDING ON CURRENT MACROECON SITUATION
-            classification = classify_cyclicality(industry)
-            if classification == 'defensive':
-                cyclicality +=1
-            elif classification == 'cyclical':
-                cyclicality -=0.5
+            # classification = classify_cyclicality(industry)
+            # if classification == 'defensive':
+            #     cyclicality +=1
+            # elif classification == 'cyclical':
+            #     cyclicality -=0.5
 
 
             quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, per, industry_per, roe, industry_roe, roa, industry_roa, eps_growth, div_growth, icr) + momentum_score(short_momentum, mid_momentum, long_momentum) + cyclicality
@@ -692,8 +692,6 @@ def process_ticker_quantitatives():
                 esg = ''
 
             
-                
-
             ## FOR extra 10 score:::
             # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
             # KEY: sustainable && long-term durability
@@ -716,37 +714,40 @@ def process_ticker_quantitatives():
                 "DIV CAGR": f"{div_growth:.2%}" if div_growth is not None else None,
                 "B-Score": round(quantitative_buffet_score, 1),
                 'Analyst Forecast': rec + '(' + upside + ')',
-                'ESG': esg
+                'Momentum': "/".join(f"{m:.1%}" if m is not None else "None" for m in (short_momentum, mid_momentum, long_momentum)),
+                'ESG': esg,
             }
 
             with shelve.open("company_cache") as cache:
                 cache[name] = quantitative_buffet_score
 
             with data_lock:
-                data.append(result)
+                if quantitative_buffet_score >= CUTOFF:
+                    data.append(result)
 
         except Exception as e:
             if "429" in str(e):
                 print("Too many requests! Waiting 10 seconds...")
                 time.sleep(10)
-            data.append({
-                "Ticker": ticker,
-                "Name": name,
-                "Industry": '',
-                "Price": '',
-                "D/E": 0,
-                "CR": 0,
-                "PBR": 0,
-                "PER": 0,
-                "ROE": 0,
-                "ROA": 0,
-                "ICR": 0,
-                "EPS CAGR": '',
-                "DIV CAGR": '',
-                "B-Score": 0.0,
-                'Analyst Forecast': '',
-                'ESG': '',
-            })
+            # data.append({
+            #     "Ticker": ticker,
+            #     "Name": '',
+            #     "Industry": '',
+            #     "Price": '',
+            #     "D/E": 0,
+            #     "CR": 0,
+            #     "PBR": 0,
+            #     "PER": 0,
+            #     "ROE": 0,
+            #     "ROA": 0,
+            #     "ICR": 0,
+            #     "EPS CAGR": '',
+            #     "DIV CAGR": '',
+            #     "B-Score": 0.0,
+            #     'Analyst Forecast': '',
+            #     'Momentum': '',
+            #     'ESG': '',
+            # })
 
         finally:
             q.task_done()
