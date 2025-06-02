@@ -13,7 +13,7 @@ The program computes scores based on profitability, valuation, debt, and other f
 ## ⚙️ Features
 
 - ✅ Gathers tickers from multiple global markets (US, KR, JP, CH, UK)
-- ✅ Uses multithreading for fast data retrieval
+- ✅ Uses multithreading for fast data retrieval on hundreds of tickers
 - ✅ Scores each stock based on Buffett-style logic:
   - Low debt-to-equity
   - Strong ROE & ROA
@@ -29,8 +29,7 @@ The program computes scores based on profitability, valuation, debt, and other f
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/buffett-stock-screener.git
-cd buffett-stock-screener
+gh repo clone aravaca/Portfolio_Optimization
 ```
 
 ### 2. Install Dependencies
@@ -46,7 +45,6 @@ FMP_API_KEY=your_api_key_here
 ```
 
 ### 4. Scoring Logic (Buffett Style)
-## 🧠 Scoring Logic (Buffett Style)
 
 The program assigns a score to each stock based on Warren Buffett’s value investing criteria, with some additional quant insights:
 
@@ -80,7 +78,7 @@ You can choose from the following countries when prompted:
 
 📌 *If no country is selected, the default is US. You will be asked to choose between S&P 500 and NASDAQ-100.*
 
-### 5.🖥️ Usage
+##  Usage
 ```bash
 python buffet.py
 ```
@@ -90,7 +88,7 @@ Limit: 50
 May take up to few minutes...
 ```
 
-### 6. Built With
+## Built With
 yfinance
 
 FMP API
@@ -104,7 +102,7 @@ Polars
 BeautifulSoup
 
 
-### 7.📁 Output
+## 📁 Output
 result_KR_20250602.xlsx
 
 
@@ -112,8 +110,6 @@ result_KR_20250602.xlsx
 
 This project is licensed under the **MIT License**.  
 You are free to use, modify, and distribute this code for personal or commercial purposes.
-
-See the [LICENSE](LICENSE) file for more details.
 
 ---
 
