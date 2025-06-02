@@ -121,13 +121,13 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
     if None not in {roe, ind_roe, per, ind_per}:
         if per > ind_per and roe < ind_roe:
             score -=2 # hard pass
-        if per < 0.7 * ind_per and roe < ind_roe:
+        if per != 0 and per < 0.7 * ind_per and roe < ind_roe:
             if pbr is not None and pbr < 1:
                 score += 0.5  # deep value + asset backing → worth a shot
 
 
     if None not in {roe, ind_roe, per, ind_per, roa, ind_roa}:
-        if roe > ind_roe and roa > ind_roa:
+        if roe > ind_roe and roa > ind_roa and per != 0:
             if per < ind_per:
                 score += 2  # strong fundamentals and value
             elif per <= 1.2 * ind_per:
