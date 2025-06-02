@@ -22,6 +22,7 @@ The program computes scores based on profitability, valuation, debt, and other f
   - Reasonable valuation (P/E, P/B, PEG)
   - Sector-relative fundamentals
 - ✅ Exports results to Excel for easy analysis
+- ✅ Includes analyst forecast (although Buffet didn't really care about this)
 
 ---
 
