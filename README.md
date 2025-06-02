@@ -91,22 +91,22 @@ May take up to few minutes...
 ```
 
 ## Built With
-yfinance...for data retrieval on global and Korean markets
+**yfinance**...for data retrieval on global and Korean markets
 
-FMP API...for data retrieval on global and Korean markets (free API required)
+**FMP API**...for data retrieval on global and Korean markets (free API required)
 
-Naver Finance...for data retrieval on Korean markets
+**Naver Finance**...for data retrieval on Korean markets
 
-pykrx...for data retrieval on Korean markets
+**pykrx**...for data retrieval on Korean markets
 
-Polars...for faster data processing and aggregation compared to pandas
+**Polars**...for faster data processing and aggregation compared to pandas
       ...utilizes multithreading and is memory-efficient on large datasets unlike pandas
 
-BeautifulSoup...for web scraping from Naver Finance
+**BeautifulSoup**...for web scraping from Naver Finance
 
 
 ## 📁 Output
-result_KR_20250602.xlsx
+**result_KR_20250602.xlsx** 
 
 
 ## 📄 License
