@@ -1,6 +1,6 @@
 # 📊 Buffett-Style Quant Stock Screener (Global + Korean Markets)
 
-This Python program screens and scores stocks using **Buffett-style value investing principles**. It gathers financial data from:
+This Python program screens and scores stocks using **Buffett-style value investing principles**. It gathers the most recent financial data from:
 
 - 🇺🇸 **Yahoo Finance (yfinance)**  
 - 🌏 **FMP API (Financial Modeling Prep)**  
@@ -61,6 +61,7 @@ The program assigns a score to each stock based on Warren Buffett’s value inve
 | Interest Coverage   | ≥ 5x                                                           | +1                  |
 | Sector Comparison   | High PER & low ROE → -2; low PER & strong ROE → +1~+2         | -2 ~ +2             |
 | Deep Value Bonus    | Low PER, strong ROE/ROA, and P/B < 1 → +0.5                    | +0.5                |
+| Momentum (3m,6m,12m)| Scores based on designated weights                              | -1 ~ +1           |
 
 Higher scores indicate better Buffett-style value candidates.
 
@@ -84,6 +85,10 @@ python buffet.py
 ```
 Limit should be the number of tickers to process. 
 100 tickers take less than a minute and going over 500 could take up to a few minutes.
+```
+num_threads = 20 #number of multithreading processors (try 10~20)
+CUTOFF = 5 # only tickers that scored above CUTOFF will appear on excel
+```
 ```vbnet
 Country (KR, JP, CH, US, UK 중 선택): KR
 Limit: 50 
