@@ -15,6 +15,7 @@ The program computes scores based on profitability, valuation, debt, and other f
 - ✅ Gathers tickers from multiple global markets (US, KR, JP, CH, UK)
 - ✅ Uses multithreading for fast data retrieval on hundreds of tickers
 - ✅ Scores each stock based on Buffett-style logic:
+  - Undervalued companies with great profitability
   - Low debt-to-equity
   - Strong ROE & ROA
   - Healthy dividend yields
