@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ```
 ### 3. Set Up API Keys
 ```bash
-touch.env
+touch .env
 ```
 ```ini
 FMP_API_KEY=your_api_key_here
