@@ -23,6 +23,8 @@ The program computes scores based on profitability, valuation, debt, and other f
   - Sector-relative fundamentals
 - ✅ Exports results to Excel for easy analysis
 - ✅ Includes analyst forecast (although Buffet didn't really care about this)
+- ✅ Includes ESG scores (only if available)
+
 
 ---
 
