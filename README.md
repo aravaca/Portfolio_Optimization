@@ -60,7 +60,7 @@ The program assigns a score to each stock based on Warren Buffett’s value inve
 | Return on Equity    | ≥ 8%                                                           | +1                  |
 | Return on Assets    | ≥ 6%                                                           | +1                  |
 | Dividend Trend      | Positive 10Y growth ≥ 10% → +1.5, ≥ 8% → +1, ≥ 6% → +0.5       | +0.5 ~ +1.5         |
-| EPS Trend           | Positive 3Y CAGR or strong growth                              | +1                  |
+| EPS Trend           | Positive 3Y CAGR or strong growth                              | -1 ~ +1             |
 | PEG Ratio           | PEG < 1 (if EPS & PER available)                               | +1                  |
 | Interest Coverage   | ≥ 5x                                                           | +1                  |
 | Industry Comparison | High PER & low ROE → -2; low PER & strong ROE → +0.5~+2        | -2 ~ +2             |

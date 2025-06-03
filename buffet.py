@@ -39,7 +39,7 @@ print('May take up to few minutes...')
 
 today = dt.datetime.today().weekday()
 weekend = today - 4 # returns 1 for saturday, 2 for sunday
-formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if today >= 5 else dt.datetime.today().strftime("%Y%m%d")
+formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if today >= 5 else (dt.datetime.today()- dt.timedelta(days =1)).strftime("%Y%m%d")
 
 dfKospi = stock.get_market_fundamental(formattedDate, market="ALL")
 
@@ -107,6 +107,9 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
 
     if eps is True:
         score += 1
+    if eps is False:
+        score -= 1
+
     elif eps is not None:
         if eps >= 0.1:
             score += 1
