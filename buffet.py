@@ -546,11 +546,6 @@ if country == 'KR':
         if ticker[5] != '0': 
             tickers.remove(ticker)
 
-# with shelve.open("ticker_cache") as cache:
-#     for ticker in tickers:
-#         cache[ticker] = ticker
-
-
 def get_momentum_batch(tickers, period_days=126):
     # Download 1 year of daily close prices for all tickers at once
     data = yf.download(tickers, period="1y", interval="1d", progress=False)['Close']
@@ -721,7 +716,6 @@ def process_ticker_quantitatives():
             else:
                 esg = ''
 
-            
             ## FOR extra 10 score:::
             # MOAT -> sustainable competitive advantage that protects a company from its competitors, little to no competition, dominant market share, customer loyalty 
             # KEY: sustainable && long-term durability
@@ -754,6 +748,8 @@ def process_ticker_quantitatives():
             with data_lock:
                 if quantitative_buffet_score >= CUTOFF:
                     data.append(result)
+                    with shelve.open("ticker_cache") as cache:
+                        cache[ticker] = name
 
         except Exception as e:
             if "429" in str(e):
