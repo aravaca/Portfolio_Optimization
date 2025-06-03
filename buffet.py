@@ -18,8 +18,9 @@ from urllib.request import urlopen
 # pip install -r requirements.txt
 
 # Use multithreading to speed up
-num_threads = 20 #5 worked just fine for limit=50
+NUM_THREADS = 20 #5 worked just fine for limit=50
 CUTOFF = 5
+
 country = input('Country (KR, JP, CH, US, UK 중 선택): ').upper() 
 if country == 'US': 
     country = None 
@@ -522,6 +523,16 @@ def get_industry_per(ind, ticker):
 
 tickers = get_tickers(country, limit, sp500)
 
+# block of code that gets rid of preferred stocks
+if country == 'KR':
+    for ticker in tickers:
+        if ticker[5] != '0': 
+            tickers.remove(ticker)
+
+with shelve.open("ticker_cache") as cache:
+    cache[ticker] = ticker
+
+
 def get_momentum_batch(tickers, period_days=126):
     # Download 1 year of daily close prices for all tickers at once
     data = yf.download(tickers, period="1y", interval="1d", progress=False)['Close']
@@ -756,7 +767,7 @@ def process_ticker_quantitatives():
 
 threads = []
 
-for _ in range(num_threads):
+for _ in range(NUM_THREADS):
     t = threading.Thread(target=process_ticker_quantitatives)
     t.start()
     threads.append(t)
