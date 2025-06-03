@@ -141,7 +141,7 @@ You are free to use, modify, and distribute this code for personal or commercial
 
 ## ✍️ Author
 
-**Hyungsuk Choi**, University of Maryland(2025)
+© 2025 **Hyungsuk Choi** <chs_3411@naver[dot]com>, University of Maryland 
 [GitHub Profile](https://github.com/aravaca) 
 
 

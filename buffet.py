@@ -1,3 +1,7 @@
+
+# SPDX-FileCopyrightText: © 2025 Hyungsuk Choi <chs_3411@naver[dot]com>, University of Maryland 
+# SPDX-License-Identifier: MIT
+
 import yfinance as yf
 import pandas as pd
 from dotenv import load_dotenv
@@ -15,11 +19,21 @@ import shelve
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
+
+################ DEPENDENCIES ###########################
+
 # pip install -r requirements.txt
 
-# Use multithreading to speed up
+#########################################################
+
+
+################ PREDETERMINED FIELDS ###################
+
 NUM_THREADS = 20 #5 worked just fine for limit=50
 CUTOFF = 5
+
+#########################################################
+
 
 country = input('Country (KR, JP, CH, US, UK 중 선택): ').upper() 
 if country == 'US': 
@@ -39,7 +53,7 @@ print('May take up to few minutes...')
 
 today = dt.datetime.today().weekday()
 weekend = today - 4 # returns 1 for saturday, 2 for sunday
-formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if today >= 5 else (dt.datetime.today()- dt.timedelta(days =1)).strftime("%Y%m%d")
+formattedDate = (dt.datetime.today() - dt.timedelta(days = weekend)).strftime("%Y%m%d") if today >= 5 else dt.datetime.today().strftime("%Y%m%d")
 
 dfKospi = stock.get_market_fundamental(formattedDate, market="ALL")
 
@@ -532,8 +546,9 @@ if country == 'KR':
         if ticker[5] != '0': 
             tickers.remove(ticker)
 
-with shelve.open("ticker_cache") as cache:
-    cache[ticker] = ticker
+# with shelve.open("ticker_cache") as cache:
+#     for ticker in tickers:
+#         cache[ticker] = ticker
 
 
 def get_momentum_batch(tickers, period_days=126):
@@ -645,6 +660,7 @@ def process_ticker_quantitatives():
     while not q.empty():
         ticker = q.get()
         try:
+
             info = yf.Ticker(ticker).info
             name = info.get("longName") or info.get("shortName", ticker)
             # sector = info.get("sector", None)
