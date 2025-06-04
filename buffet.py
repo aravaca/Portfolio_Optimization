@@ -127,7 +127,9 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
     elif eps is not None:
         if eps >= 0.1:
             score += 1
-        if eps != 0 and per is not None:
+        if eps < 0:
+            score -= 1
+        if eps > 0 and per is not None:
             peg = per / (eps * 100) #peg ratio, underv if less than 1
             if peg <= 1:
                 score += 1
