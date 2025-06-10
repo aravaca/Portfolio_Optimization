@@ -107,10 +107,10 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
 
     if pbr is not None and (pbr <= 1.5 and pbr != 0):
         score +=1
-    if roe is not None and roe >= 0.08: #8% basic buffet fundamental rate
-        score +=1
-    if roa is not None and roa >= 0.06: #6% basic buffet fundamental rate
-        score +=1
+    # if roe is not None and roe >= 0.08: #8% basic buffet fundamental rate
+    #     score +=1
+    # if roa is not None and roa >= 0.06: #6% basic buffet fundamental rate
+    #     score +=1
     if div is not None: #cagr = +4~6-10%
         if div >= 0.1:
             score +=1.5
@@ -149,13 +149,18 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
 
 
     if None not in {roe, ind_roe, per, ind_per, roa, ind_roa}:
-        if roe > ind_roe and roa > ind_roa and per != 0:
+        if roe > ind_roe and per != 0:
             if per < ind_per:
-                score += 2  # strong fundamentals and value
+                score += 1  # strong fundamentals and value
+                if roa > ind_roa:
+                    score += 1
             elif per <= 1.2 * ind_per:
-                score += 1  # great business, slightly overvalued (still reasonable)
+                score += 0.5  # great business, slightly overvalued (still reasonable)
+                if roa > ind_roa:
+                    score += 0.5
             else:
-                score += 0.5  # great business, but may be overpriced
+                if roa > ind_roa:
+                    score += 0.5 #great business, but may be overpriced
 
     return score
 
@@ -481,7 +486,7 @@ def get_industry_roe(ind):
             else:
                 return 0.08
         except Exception:
-            return 0.08
+            return 0.08 
     else:
         return 0.08
 
@@ -494,6 +499,8 @@ def get_industry_roa(ind):
             return 0.06
         except Exception:
             return 0.06
+    elif country == 'KR' and any(kw in ind for kw in ['Insurance', 'Bank']):
+        return 0.01
     else:
         return 0.06
 
@@ -688,6 +695,7 @@ def process_ticker_quantitatives():
                                                                        # low per could be undervalued or company in trouble, IT, 바이오 등 성장산업은 자연스레 per이 높게 형성
                                                                        # 저per -> 수익성 높거나 주가가 싸다 고pbr -> 자산은 적은데 시장에서 비싸게 봐준다
             industry_per = get_industry_per(industry, ticker)
+            industry_per = round(industry_per) if industry_per is not None else industry_per
             industry_roe = get_industry_roe(industry)
             industry_roa = get_industry_roa(industry)
 
@@ -738,7 +746,7 @@ def process_ticker_quantitatives():
                 "D/E": round(debtToEquity, 2) if debtToEquity is not None else None,
                 "CR": round(currentRatio, 2) if currentRatio is not None else None,
                 "PBR": round(pbr,2) if pbr is not None else None,
-                "PER": round(per,2) if per is not None else None,
+                "PER (동일업종)": f'{round(per,2)} ({industry_per})' if per is not None else None,
                 "ROE": str(round(roe*100,2)) + '%' if roe is not None else None,
                 "ROA": str(round(roa*100,2)) + '%' if roa is not None else None,
                 "ICR": icr,
