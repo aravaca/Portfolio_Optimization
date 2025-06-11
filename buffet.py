@@ -117,7 +117,7 @@ def get_tickers_by_country(country: str, limit: int = 100, apikey: str = 'your_a
 def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, div, icr):
     score = 0
     #basic buffet-style filtering
-    if de is not None and de <= 0.5:
+    if de is not None and de <= 0.5 and de != 0:
         score +=1
     if cr is not None and (cr >= 1.5 and cr <= 2.5):
         score +=1
