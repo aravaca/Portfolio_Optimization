@@ -31,6 +31,23 @@ from urllib.request import urlopen
 
 NUM_THREADS = 20 #5 worked just fine for limit=50
 CUTOFF = 5
+lee_kw_list = [
+    "Semiconductors",
+    "Artificial Intelligence",
+    "AI",
+    "Data Center",
+    "Renewable",
+    "Energy",
+    "Plant",
+    "Construction",
+    "Aerospace & Defense",
+    "Biotechnology",
+    "Entertainment",
+    "Media",
+    "Agricultural",
+    "Railroads",
+    ""
+]
 
 #########################################################
 
@@ -107,23 +124,25 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
 
     if pbr is not None and (pbr <= 1.5 and pbr != 0):
         score +=1
-    # if roe is not None and roe >= 0.08: #8% basic buffet fundamental rate
-    #     score +=1
-    # if roa is not None and roa >= 0.06: #6% basic buffet fundamental rate
-    #     score +=1
+        # 2. 저PBR + 고ROA 전략 (가치 + 자산 활용 효율)
+        # 아이디어: 자산 대비 효율적으로 수익을 내는 기업 중 저평가 기업 선별
+        if None not in {roa, cr}:
+            if pbr <= 1.0 and roa >= ind_roa and cr >= 1.5:
+                score +=1
+
+    # 고배당주 수혜 예상
     if div is not None: #cagr = +4~6-10%
         if div >= 0.1:
-            score +=1.5
+            score +=1.0
         elif div >= 0.08:
-            score +=1
+            score +=0.75
         elif div >= 0.06:
             score +=0.5
 
     if eps is True:
         score += 1
-    if eps is False:
+    elif eps is False:
         score -= 1
-
     elif eps is not None:
         if eps >= 0.1:
             score += 1
@@ -138,30 +157,32 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
         score +=1
 
     #my quant ideas 
+    if None not in {div, eps}:
+        #  3. 고배당 + 고EPS 성장률 전략 (배당 성장주 전략)
+        # 아이디어: 고배당이면서 실적 성장세가 뚜렷한 기업
+        if div >= 0.3 and eps >= 0.3:
+            score +=1
+
+
     if None not in {roe, ind_roe, per, ind_per}:
         if per > ind_per and roe < ind_roe:
             score -=2 # hard pass
-            if roe < 0:
+            if roe < 0:  #EVEN WORSE
                 score -=1
-        if per != 0 and per < 0.7 * ind_per and roe < ind_roe:
-            if pbr is not None and pbr < 1:
-                score += 0.5  # deep value + asset backing → worth a shot
-
 
     if None not in {roe, ind_roe, per, ind_per, roa, ind_roa}:
+        # 1. 저PER + 고ROE 전략 (가치 + 질적 우량주)
+        # 아이디어: 저평가된 기업 중 자본수익률이 높은 우량주 발굴
         if roe > ind_roe and per != 0:
             if per < ind_per:
-                score += 1  # strong fundamentals and value
-                if roa > ind_roa:
-                    score += 1
-            elif per <= 1.2 * ind_per:
-                score += 0.5  # great business, slightly overvalued (still reasonable)
+                score += 1.5  # strong fundamentals and value
                 if roa > ind_roa:
                     score += 0.5
-            else:
+            elif per <= 1.2 * ind_per:
+                score += 0.75  # great business, slightly overvalued (still reasonable)
                 if roa > ind_roa:
-                    score += 0.5 #great business, but may be overpriced
-
+                    score += 0.25
+         
     return score
 
 def getFs (item, ticker):
@@ -488,7 +509,7 @@ def get_industry_roe(ind):
         except Exception:
             return 0.08 
     else:
-        return 0.08
+        return 0.1
 
 def get_industry_roa(ind):
     if country is None:
@@ -502,7 +523,7 @@ def get_industry_roa(ind):
     elif country == 'KR' and any(kw in ind for kw in ['Insurance', 'Bank']):
         return 0.01
     else:
-        return 0.06
+        return 0.05
 
     
 
@@ -675,6 +696,7 @@ def process_ticker_quantitatives():
             name = info.get("longName") or info.get("shortName", ticker)
             # sector = info.get("sector", None)
             industry = info.get("industry", None)
+            sub_industry = info.get('subIndustry', None)
             currentPrice = info.get("currentPrice", None)
             percentage_change = get_percentage_change(ticker)
             target_mean = info.get('targetMeanPrice', 0)
@@ -721,8 +743,15 @@ def process_ticker_quantitatives():
             # if classification == 'defensive':
             #     cyclicality +=1
             # elif classification == 'cyclical':
-            #     cyclicality -=0.5
-
+            #     cyclicality -=0.
+            
+            if industry is not None:
+                if any(kw.lower() in industry.lower() for kw in lee_kw_list):
+                    cyclicality += 1
+            if cyclicality == 0:
+                if sub_industry is not None:
+                    if any(kw.lower() in sub_industry.lower() for kw in lee_kw_list):
+                        cyclicality +=1
 
             quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, per, industry_per, roe, industry_roe, roa, industry_roa, eps_growth, div_growth, icr) + momentum_score(short_momentum, mid_momentum, long_momentum) + cyclicality
 
@@ -739,23 +768,23 @@ def process_ticker_quantitatives():
             # regulatory advantage(gov protection), patients(Pfizer, Intel)
 
             result = {
-                "Ticker": ticker,
+                "Ticker": ticker[:6] if country == 'KR' else ticker,
                 "Name": name,
                 "Industry": industry,
                 "Price": f"{currentPrice:,.0f}" + percentage_change if country == 'KR' or country == 'JP' else f"{currentPrice:,.2f}" + percentage_change,
                 "D/E": round(debtToEquity, 2) if debtToEquity is not None else None,
                 "CR": round(currentRatio, 2) if currentRatio is not None else None,
                 "PBR": round(pbr,2) if pbr is not None else None,
-                "PER (동일업종)": f'{round(per,2)} ({industry_per})' if per is not None else None,
+                "PER": f'{round(per,2)} ({industry_per})' if per is not None else None,
                 "ROE": str(round(roe*100,2)) + '%' if roe is not None else None,
                 "ROA": str(round(roa*100,2)) + '%' if roa is not None else None,
                 "ICR": icr,
                 "EPS CAGR": eps_growth if isinstance(eps_growth, bool) else (f"{eps_growth:.2%}" if eps_growth is not None else None), #use this instead of operating income incrs for quart/annual 
                 "DIV CAGR": f"{div_growth:.2%}" if div_growth is not None else None,
                 "B-Score": round(quantitative_buffet_score, 1),
-                'Analyst Forecast': rec + '(' + upside + ')',
+                # 'Analyst Forecast': rec + '(' + upside + ')',
                 'Momentum': "/".join(f"{m:.1%}" if m is not None else "None" for m in (short_momentum, mid_momentum, long_momentum)),
-                'ESG': esg,
+                # 'ESG': esg, #works only for US stocks
             }
 
             with data_lock:
