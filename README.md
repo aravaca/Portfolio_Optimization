@@ -6,7 +6,11 @@ This Python program screens and scores stocks using **Buffett-style value invest
 - 🌏 **FMP API (Financial Modeling Prep)**  
 - 🇰🇷 **Naver Finance** and **KRX (KOSPI/KOSDAQ)**  
 
-The program computes scores based on profitability, valuation, debt, and other fundamentals and exports results to a **clean Excel file**, providing practical insight to investors.
+The program (buffett.py) computes scores based on profitability, valuation, debt, and other fundamentals and exports results to a **clean Excel file**, providing practical insight to investors.
+
+*** The repository also includes sharpe.ipynb and sortino.ipynb, which allow for the maximization of Sharpe and Sortino ratios for a group of stocks to optimize a portfolio.
+
+Please note that this program only analyzes a business's financials and doesn't provide a complete assessment of its overall quality.  For a thorough understanding, you should supplement this information with your own research, including relevant financial news, to make informed investment decisions.
 
 ---
 
