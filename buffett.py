@@ -112,10 +112,10 @@ def get_tickers_by_country(country: str, limit: int = 100, apikey: str = 'your_a
     data = response.json()
     return [item['symbol'] for item in data]
 
-# buffet's philosophy & my quant ideas
-def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, div, icr):
+# buffett's philosophy & my quant ideas
+def buffett_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, div, icr):
     score = 0
-    #basic buffet-style filtering
+    #basic buffett-style filtering
     if de is not None and de <= 0.5 and de != 0:
         score +=1
     if cr is not None and (cr >= 1.5 and cr <= 2.5):
@@ -140,9 +140,10 @@ def buffet_score (de, cr, pbr, per, ind_per, roe, ind_roe, roa, ind_roa, eps, di
 
     if eps is True:
         score += 1
-    elif eps is False:
+    if eps is False:
         score -= 1
-    elif eps is not None:
+    
+    if not isinstance(eps, bool) and eps is not None:
         if eps >= 0.1:
             score += 1
         if eps < 0:
@@ -579,7 +580,10 @@ if country == 'KR':
 
 def get_momentum_batch(tickers, period_days=126):
     # Download 1 year of daily close prices for all tickers at once
-    data = yf.download(tickers, period="1y", interval="1d", progress=False)['Close']
+    try:
+        data = yf.download(tickers, period="1y", interval="1d", progress=False)['Close']
+    except Exception:
+        return {}
     # data is a DataFrame: rows = dates, columns = tickers
 
     momentum_dict = {}
@@ -725,9 +729,9 @@ def process_ticker_quantitatives():
             #ROE가 높고 ROA는 낮다면? → 부채를 많이 이용해 수익을 낸 기업일 수 있음. ROE와 ROA 모두 높다면? → 자산과 자본 모두 효율적으로 잘 운용하고 있다는 의미.
             #A = L + E
             
-            eps_growth = has_stable_eps_growth_cagr(ticker) # earnings per share, the higher the better, Buffet looks for stable EPS growth
+            eps_growth = has_stable_eps_growth_cagr(ticker) # earnings per share, the higher the better, buffett looks for stable EPS growth
             # eps_growth_quart = has_stable_eps_growth_quarterly(ticker) 
-            div_growth = has_stable_dividend_growth_cagr(ticker) # Buffet looks for stable dividend growth for at least 10 years
+            div_growth = has_stable_dividend_growth_cagr(ticker) # buffett looks for stable dividend growth for at least 10 years
             # bvps_growth = bvps_undervalued(info.get('bookValue', None), currentPrice)
             
             icr = get_interest_coverage_ratio(ticker)
@@ -752,7 +756,7 @@ def process_ticker_quantitatives():
                     if any(kw.lower() in sub_industry.lower() for kw in lee_kw_list):
                         cyclicality +=1
 
-            quantitative_buffet_score = buffet_score(debtToEquity, currentRatio, pbr, per, industry_per, roe, industry_roe, roa, industry_roa, eps_growth, div_growth, icr) + momentum_score(short_momentum, mid_momentum, long_momentum) + cyclicality
+            quantitative_buffett_score = buffett_score(debtToEquity, currentRatio, pbr, per, industry_per, roe, industry_roe, roa, industry_roa, eps_growth, div_growth, icr) + momentum_score(short_momentum, mid_momentum, long_momentum) + cyclicality
 
             rec = info.get('recommendationKey', None)
             if country is None:
@@ -780,19 +784,19 @@ def process_ticker_quantitatives():
                 "ICR": icr,
                 "EPS CAGR": eps_growth if isinstance(eps_growth, bool) else (f"{eps_growth:.2%}" if eps_growth is not None else None), #use this instead of operating income incrs for quart/annual 
                 "DIV CAGR": f"{div_growth:.2%}" if div_growth is not None else None,
-                "B-Score": round(quantitative_buffet_score, 1),
+                "B-Score": round(quantitative_buffett_score, 1),
                 # 'Analyst Forecast': rec + '(' + upside + ')',
                 'Momentum': "/".join(f"{m:.1%}" if m is not None else "None" for m in (short_momentum, mid_momentum, long_momentum)),
                 # 'ESG': esg, #works only for US stocks
             }
 
             with data_lock:
-                if quantitative_buffet_score >= CUTOFF:
+                if quantitative_buffett_score >= CUTOFF:
                     data.append(result)
                     with shelve.open("ticker_cache") as cache:
                         cache[ticker] = name
                     with shelve.open("company_cache") as cache:
-                        cache[name] = quantitative_buffet_score
+                        cache[name] = quantitative_buffett_score
 
         except Exception as e:
             if "429" in str(e):

@@ -57,18 +57,17 @@ The program assigns a score to each stock based on Warren Buffett’s value inve
 | Debt-to-Equity      | ≤ 0.5                                                          | +1                  |
 | Current Ratio       | Between 1.5 and 2.5                                            | +1                  |
 | Price-to-Book (P/B) | ≤ 1.5                                                          | +1                  |
-| Return on Equity    | ≥ 8%                                                           | +1                  |
-| Return on Assets    | ≥ 6%                                                           | +1                  |
-| Dividend Trend      | Positive 10Y growth ≥ 10% → +1.5, ≥ 8% → +1, ≥ 6% → +0.5       | +0.5 ~ +1.5         |
+| Return on Equity    | ≥ 8-10%                                                           | +1                  |
+| Return on Assets    | ≥ 5-6%                                                           | +1                  |
+| Dividend Trend      | Positive 10Y growth ≥ 10% → +1.5, ≥ 8% → +1, ≥ 6% → +0.5       | +0.5 ~ +1.0        |
 | EPS Trend           | Positive 3Y CAGR or strong growth                              | -1 ~ +1             |
 | PEG Ratio           | PEG < 1 (if EPS & PER available)                               | +1                  |
 | Interest Coverage   | ≥ 5x                                                           | +1                  |
-| Industry Comparison | High PER & low ROE → -2; low PER & strong ROE → +0.5~+2        | -2 ~ +2             |
-| Deep Value Bonus    | Low PER, Low ROE, and P/B < 1 → +0.5 (worth a shot?)           | +0.5                |
+| Industry Comparison | High PER & low ROE → -2~-3; low PER & strong ROE → +1~+2          | -2 ~ +2             |
 | Momentum (3m,6m,12m)| Scores based on designated weights on each time window         | -1 ~ +1             |
-| Cyclicity (optional)| Scores based on whether the stock is cyclical or defensive     | -1 ~ +1             |
+| Cyclicity (optional)| Scores based on whether the stock is cyclical, defensive, or politically-themed | -1 ~ +1             |
 
-Higher scores indicate better Buffett-style value candidates.
+Higher scores indicate better Buffett-style value candidates. You can add your own quant ideas on top of these basic conditions.
 
 ## 🌍 Supported Markets
 
@@ -92,6 +91,7 @@ python buffet.py
 ```
 NUM_THREADS = 20 #number of multithreading processors (try 10~20 to not hog your system)
 CUTOFF = 5 #only tickers that scored above CUTOFF will appear on excel
+kw_list = [] #수혜주/경기주/방어주 산업군 키워드 리스트
 ```
 **Limit** should be the number of tickers to process. 
 100 tickers take less than a minute and going over 500 could take up to a few minutes.
