@@ -29,9 +29,9 @@ from urllib.request import urlopen
 
 ################ PREDETERMINED FIELDS ###################
 
-NUM_THREADS = 20 #5 worked just fine for limit=50
+NUM_THREADS = 20 #multithreading 
 CUTOFF = 5
-lee_kw_list = [
+lee_kw_list = [ #2025 이재명 정부 수혜주
     "Semiconductors",
     "Artificial Intelligence",
     "AI",
@@ -53,7 +53,8 @@ lee_kw_list = [
 
 country = input('Country (KR, JP, CH, US, UK 중 선택): ').upper() 
 if country == 'US': 
-    country = None 
+    country = None
+    CUTOFF -= 2 #오버슈팅 오차조정
 
 if not country:
     limit = 100
