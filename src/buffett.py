@@ -686,7 +686,7 @@ q = Queue()
 for ticker in tickers:
     q.put(ticker)
 
-with shelve.open("ticker_cache") as cache:
+with shelve.open("cache/ticker_cache") as cache:
     # Clear all the cache entries by deleting the keys
     cache.clear()
 
@@ -793,9 +793,9 @@ def process_ticker_quantitatives():
             with data_lock:
                 if quantitative_buffett_score >= CUTOFF:
                     data.append(result)
-                    with shelve.open("ticker_cache") as cache:
-                        cache[ticker] = name
-                    with shelve.open("company_cache") as cache:
+                    with shelve.open("cache/ticker_cache") as cache:
+                        cache[ticker] = (name, quantitative_buffett_score)
+                    with shelve.open("cache/company_cache") as cache:
                         cache[name] = quantitative_buffett_score
 
         except Exception as e:
@@ -843,9 +843,9 @@ df = pl.DataFrame(data)
 df_sorted = df.sort("B-Score", descending = True)
 
 if country: 
-    df_sorted.to_pandas().to_excel(f"result_{country}_{formattedDate}.xlsx", index=False)
+    df_sorted.to_pandas().to_excel(f"results/result_{country}_{formattedDate}.xlsx", index=False)
 
 elif sp500:
-    df_sorted.to_pandas().to_excel(f"sp500_{formattedDate}.xlsx", index=False)
+    df_sorted.to_pandas().to_excel(f"results/sp500_{formattedDate}.xlsx", index=False)
 else:
-    df_sorted.to_pandas().to_excel(f"nasdaq100_{formattedDate}.xlsx", index=False)
+    df_sorted.to_pandas().to_excel(f"results/nasdaq100_{formattedDate}.xlsx", index=False)
