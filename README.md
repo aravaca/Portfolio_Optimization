@@ -85,7 +85,7 @@ You can choose from the following countries when prompted:
 
 ##  Usage
 ```bash
-python buffet.py
+python buffett.py
 ```
 **Predetermined fields**
 ```
