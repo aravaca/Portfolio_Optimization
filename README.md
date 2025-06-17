@@ -59,11 +59,11 @@ The program assigns a score to each stock based on Warren Buffett’s value inve
 | Price-to-Book (P/B) | ≤ 1.5                                                          | +1                  |
 | Return on Equity    | ≥ 8-10%                                                           | +1                  |
 | Return on Assets    | ≥ 5-6%                                                           | +1                  |
-| Dividend Trend      | Positive 10Y growth ≥ 10% → +1.5, ≥ 8% → +1, ≥ 6% → +0.5       | +0.5 ~ +1.0        |
+| Dividend Trend      | Positive 10Y growth ≥ 10% → +1.0, ≥ 8% → +0.75, ≥ 6% → +0.5       | +0.5 ~ +1.0        |
 | EPS Trend           | Positive 3Y CAGR or strong growth                              | -1 ~ +1             |
 | PEG Ratio           | PEG < 1 (if EPS & PER available)                               | +1                  |
 | Interest Coverage   | ≥ 5x                                                           | +1                  |
-| Industry Comparison | High PER & low ROE → -2~-3; low PER & strong ROE → +1~+2          | -2 ~ +2             |
+| Industry Comparison | High PER & low ROE → -2~-3; low PER & strong ROE → +1~+2          | -3 ~ +2             |
 | Momentum (3m,6m,12m)| Scores based on designated weights on each time window         | -1 ~ +1             |
 | Cyclicity (optional)| Scores based on whether the stock is cyclical, defensive, or politically-themed | -1 ~ +1             |
 
