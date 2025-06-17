@@ -749,13 +749,14 @@ def process_ticker_quantitatives():
             # elif classification == 'cyclical':
             #     cyclicality -=0.
             
-            if industry is not None:
-                if any(kw.lower() in industry.lower() for kw in lee_kw_list):
-                    cyclicality += 1
-            if cyclicality == 0:
-                if sub_industry is not None:
-                    if any(kw.lower() in sub_industry.lower() for kw in lee_kw_list):
-                        cyclicality +=1
+            if country == 'KR':
+                if industry is not None:
+                    if any(kw.lower() in industry.lower() for kw in lee_kw_list):
+                        cyclicality += 1
+                if cyclicality == 0:
+                    if sub_industry is not None:
+                        if any(kw.lower() in sub_industry.lower() for kw in lee_kw_list):
+                            cyclicality +=1
 
             quantitative_buffett_score = buffett_score(debtToEquity, currentRatio, pbr, per, industry_per, roe, industry_roe, roa, industry_roa, eps_growth, div_growth, icr) + momentum_score(short_momentum, mid_momentum, long_momentum) + cyclicality
 
