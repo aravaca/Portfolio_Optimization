@@ -85,6 +85,7 @@ You can choose from the following countries when prompted:
 
 ##  Usage
 ```bash
+cd src
 python buffett.py
 ```
 **Predetermined fields**
@@ -115,7 +116,7 @@ May take up to few minutes...
 **BeautifulSoup**...for web scraping from Naver Finance and FullRatio
 
 
-## 📁 Output
+## 📁 Output (check /results)
 **result_KR_20250602.xlsx** 
 
 
